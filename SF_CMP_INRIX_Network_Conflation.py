@@ -125,7 +125,7 @@ endpoints_cnt['NodeID'] = endpoints_cnt.index+1
 endpoints_cnt['Coordinates'] = list(zip(endpoints_cnt.Longitude, endpoints_cnt.Latitude))
 endpoints_cnt['Coordinates'] = endpoints_cnt['Coordinates'].apply(Point)
 endpoints_cnt_gpd = gp.GeoDataFrame(endpoints_cnt, geometry='Coordinates')
-endpoints_cnt_gpd.to_file(directory + "INRIX_HERE_SF_Endpoints_unique.shp")
+endpoints_cnt_gpd.to_file(inrix_sf + '_prj_endpoints_unique.shp')
 
 endpoints=endpoints.merge(endpoints_cnt, on=['Latitude', 'Longitude'], how='left')
 
