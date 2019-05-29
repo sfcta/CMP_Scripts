@@ -1,13 +1,30 @@
+'''
+This script is developed to automatically establish the corresponding relationship between CMP segments and INRIX XD network links.
+It finds INRIX links that are near each CMP segment and decides the matching links based on street name, angle and distance attributes.
 
-# Conflation process setup
+INPUTS:
+1. cmp_roadway_segments.shp, the CMP segment shapefile provided by SFCTA.
+2. inrix_xd_sf.shp, the INRIX XD network shapefile provided by INRIX. Because the originial shapefile provided is for the whole
+state of California, only roadways in San Francisco County are selected and exported as inrix_xd_sf.shp.
 
-# Specify working directory
-directory = 'Z:/SF_CMP/INRIX Data/NetworkConflation_CCL/'
+OUTPUTS:
+1. cmp_roadway_segments_matchedlength_check.shp, a shapefile generated for quality check purpose. The field "Len_Ratio" indicates the 
+ratio of the total length of matched INRIX links over the length of the CMP segment. Special attention should should be given to 
+segments whose Len_Ratio is below 95% or over 100%. 
+2. CMP_Segment_INRIX_Links_Correspondence.csv, a csv file containing the correspondence between CMP segments and INRIX XD links. The
+field "Length_Matched" indicates the length of an INRIX link matched to a CMP segment. Note that the table is not final as quality 
+assurance needs to be performed on the conflation results and necessary changes could be made. Please see 
+Network Conflation Process Memo.docx for more detailed discussions.
 
-# Specify INRIX network file name
-inrix_sf = 'INRIX_XD_HERE_SF_CrossCountyLine'
+USAGE:
+The script should be placed under the same folder with input files. Use python SF_CMP_INRIX_Network_Conflation.py to run the script.
+'''
 
-# Specify CMP network file name
+
+# Specify input file names
+# INRIX XD network
+inrix_sf = 'inrix_xd_sf'
+# CMP network
 cmp = 'cmp_roadway_segments'
 
 
@@ -24,29 +41,28 @@ warnings.filterwarnings("ignore")
 
 #Define WGS 1984 coordinate system
 wgs84 = {'proj': 'longlat', 'ellps': 'WGS84', 'datum': 'WGS84', 'no_defs': True}
-
 #Define NAD 1983 StatePlane California III
 cal3 = {'proj': 'lcc +lat_1=37.06666666666667 +lat_2=38.43333333333333 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000.0000000002', 'ellps': 'GRS80', 'datum': 'NAD83', 'no_defs': True}
 
-# Convert original coordinate system to state plane
+# Convert original coordinate system to California III state plane
 # CMP network
-cmp_segs_org=gp.read_file(directory + cmp + '.shp')
+cmp_segs_org=gp.read_file(cmp + '.shp')
 cmp_segs_prj = cmp_segs_org.to_crs(cal3)
 cmp_segs_prj['cmp_name'] = cmp_segs_prj['cmp_name'].str.replace('/ ','/')
 cmp_segs_prj['Length'] = cmp_segs_prj.geometry.length 
 cmp_segs_prj['Length'] = cmp_segs_prj['Length'] * 3.2808  #meters to feet
-cmp_segs_prj.to_file(directory + cmp + '_prj.shp')
+cmp_segs_prj.to_file(cmp + '_prj.shp')
 
 # INRIX XD network
-inrix_net_org=gp.read_file(directory + inrix_sf + '.shp')
+inrix_net_org=gp.read_file(inrix_sf + '.shp')
 inrix_net_prj = inrix_net_org.to_crs(cal3)
 inrix_net_prj['Length'] = inrix_net_prj.geometry.length 
 inrix_net_prj['Length'] = inrix_net_prj['Length'] * 3.2808  #meters to feet
-inrix_net_prj.to_file(directory + inrix_sf + '_prj.shp')
+inrix_net_prj.to_file(inrix_sf + '_prj.shp')
 
 
 # # Get endpoints of INRIX links
-#Attributes
+# Attributes to be included
 vschema =  {'geometry': 'Point',
              'properties': {'SegID': 'int',
                             'RoadName': 'str',
@@ -54,10 +70,9 @@ vschema =  {'geometry': 'Point',
                             'Latitude': 'float',
                             'Longitude': 'float'}}
 #Input file
-inrixin = directory+inrix_sf+'_prj.shp'
-
+inrixin = inrix_sf+'_prj.shp'
 #Output file
-inrixout = directory + "INRIX_HERE_SF_Endpoints.shp"
+inrixout = inrix_sf + '_prj_endpoints.shp'
 with fiona.open(inrixout, mode='w', crs=cal3, driver='ESRI Shapefile', schema=vschema) as output:
     layer= fiona.open(inrixin)
     for line in layer:
@@ -99,7 +114,7 @@ with fiona.open(inrixout, mode='w', crs=cal3, driver='ESRI Shapefile', schema=vs
 
 
 # Read in the created inrix endpoints file
-endpoints=gp.read_file(directory + "INRIX_HERE_SF_Endpoints.shp")
+endpoints=gp.read_file(inrix_sf + '_prj_endpoints.shp')
 
 # Assign unique node id
 endpoints_cnt=endpoints.groupby(['Latitude', 'Longitude']).SegID.count().reset_index()
@@ -126,7 +141,7 @@ inrix_net_prj=inrix_net_prj.merge(endpoints_end, on='SegID')
 
 
 # # Get endnodes of CMP segments
-#Attributes
+# Attributes to be included
 cmp_schema =  {'geometry': 'Point',
              'properties': {'cmp_segid': 'int',
                             'cmp_name': 'str',
@@ -136,10 +151,10 @@ cmp_schema =  {'geometry': 'Point',
                             'Longitude': 'float'}}
 node_cnt=0
 #Input file
-cmpin = directory + cmp + '_prj.shp'
+cmpin = cmp + '_prj.shp'
 
 #Output file
-cmpout = directory + 'cmp_roadway_endpoints.shp'
+cmpout = cmp + '_prj_endpoints.shp'
 with fiona.open(cmpout, mode='w', crs=cal3, driver='ESRI Shapefile', schema=cmp_schema) as output:
     layer= fiona.open(cmpin)
     for line in layer:
@@ -184,7 +199,7 @@ with fiona.open(cmpout, mode='w', crs=cal3, driver='ESRI Shapefile', schema=cmp_
 
 
 # Read in the created cmp endpoints
-cmp_endpoints=gp.read_file(directory + 'cmp_roadway_endpoints.shp')
+cmp_endpoints=gp.read_file(cmp + '_prj_endpoints.shp')
 
 cmp_endpoint_b=cmp_endpoints[cmp_endpoints['type']=='begin'][['cmp_segid','Latitude','Longitude', 'NodeID']]
 cmp_endpoint_b.columns=['cmp_segid','B_Lat','B_Long', 'CMP_Node_B']
@@ -194,20 +209,20 @@ cmp_endpoint_e.columns=['cmp_segid','E_Lat','E_Long', 'CMP_Node_E']
 cmp_segs_prj=cmp_segs_prj.merge(cmp_endpoint_b, on='cmp_segid', how='left')
 cmp_segs_prj=cmp_segs_prj.merge(cmp_endpoint_e, on='cmp_segid', how='left')
 
+# Calculate the bearing of cmp segments
 cmp_segs_prj['Degree']=cmp_segs_prj.apply(lambda x: (180 / math.pi) * math.atan2(x['E_Long'] - x['B_Long'], x['E_Lat'] - x['B_Lat']), axis=1)
 
 
 # # Network Conflation
 # ## Get nearby INRIX links 
-
 # Create a buffer zone for each cmp segment
-ft=150
+ft=150  # 150 ft distance
 mt=round(ft/3.2808,4)
 cmp_segs_buffer=cmp_segs_prj.copy()
 cmp_segs_buffer['geometry'] = np.where(cmp_segs_buffer['cmp_segid'] == 81,
                                        cmp_segs_buffer.geometry.buffer(mt * 2),
                                        cmp_segs_buffer.geometry.buffer(mt))
-cmp_segs_buffer.to_file(directory + 'cmp_roadway_segments_prj_buffer.shp')
+cmp_segs_buffer.to_file(cmp + '_prj_buffer.shp')
 
 # INRIX lines intersecting cmp segment buffer zone
 inrix_lines_intersect=gp.sjoin(inrix_net_prj, cmp_segs_buffer, op='intersects').reset_index()
@@ -217,7 +232,6 @@ inrix_lines_within=gp.sjoin(inrix_net_prj, cmp_segs_buffer, op='within').reset_i
 
 
 # ## Determine matching INRIX links within each CMP buffer
-
 len_ratio_thrhd=0.8
 angle_thrhd=15
 for cmp_seg_idx in range(len(cmp_segs_prj)):
@@ -335,18 +349,15 @@ inrix_matched_length.columns = ['cmp_segid', 'Len_Matched']
 inrix_matched_length['cmp_segid']= inrix_matched_length['cmp_segid'].astype(int)
 cmp_segs_prj=cmp_segs_prj.merge(inrix_matched_length, on='cmp_segid', how='left')
 
-
 # Calculate the ratio of the total length of matched INRIX links to the CMP segment length
 cmp_segs_prj['Len_Ratio']=np.where(pd.isnull(cmp_segs_prj['Len_Matched']), 
                                    0, 
                                    round(100* cmp_segs_prj['Len_Matched']/cmp_segs_prj['Length'], 1))
 
 
-# ## Search forward and backward based on already matched INRIX links 
 
+# ## Search forward and backward based on already matched INRIX links 
 # Establish sequence from matched links
-len_ratio_thrhd=0.8
-angle_thrhd=15
 gap_thrhd = 0.01
 for cmp_seg_idx in range(len(cmp_segs_prj)):
     if (cmp_segs_prj.loc[cmp_seg_idx, 'Len_Ratio']>0) & (cmp_segs_prj.loc[cmp_seg_idx, 'Len_Ratio']<98):
@@ -609,22 +620,18 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
 
 
 # ## Find matches for remaining CMP segments that don't have any matches from previous steps
-
 # Create buffers at both endpoints to get intersecting INRIX links
 ft=150
 mt=round(ft/3.2808,4)
 cmp_endpoints_buffer=cmp_endpoints.copy()
 cmp_endpoints_buffer['geometry'] = cmp_endpoints_buffer.geometry.buffer(mt)
-cmp_endpoints_buffer.to_file(directory + 'cmp_roadway_endpoints_prj_buffer.shp')
+cmp_endpoints_buffer.to_file(cmp + '_prj_endpoints_buffer.shp')
 
 # INRIX lines intersecting with cmp endpoint buffer zone
 inrix_lines_intersect_ep=gp.sjoin(inrix_net_prj, cmp_endpoints_buffer, op='intersects').reset_index()
 
 
 # Find matching lines for zero Len_Ratio
-len_ratio_thrhd=0.8
-angle_thrhd=15
-gap_thrhd = 0.01
 for cmp_seg_idx in range(len(cmp_segs_prj)):
     if cmp_segs_prj.loc[cmp_seg_idx, 'Len_Ratio']==0:
         cmp_seg_id = cmp_segs_prj.loc[cmp_seg_idx, 'cmp_segid']
@@ -857,10 +864,10 @@ cmp_segs_prj=cmp_segs_prj.merge(inrix_matched_length, on='cmp_segid', how='left'
 cmp_segs_prj['Len_Ratio']=np.where(pd.isnull(cmp_segs_prj['Len_Matched']), 
                                    0, 
                                    round(100* cmp_segs_prj['Len_Matched']/cmp_segs_prj['Length'], 1))
-cmp_segs_prj['CMPL_Ratio']=np.where(pd.isnull(cmp_segs_prj['Len_Matched']), 
-                                   0, 
-                                   round(100* cmp_segs_prj['Len_Matched']/5280/cmp_segs_prj['length'],1))
 
-# Export conflation files
-cmp_segs_prj.to_file(directory + cmp + '_prj_MatchedLength_Check.shp')
-inrix_lines_matched_final[['cmp_segid', 'SegID', 'Length_Matched', 'INRIX_B_Loc', 'INRIX_E_Loc', 'INX_B_CMP_B', 'INX_E_CMP_E']].to_csv(directory + 'CMP_Segment_INRIX_Links_Correspondence.csv', index=False)
+inrix_lines_matched_output = inrix_lines_matched_final[['cmp_segid', 'SegID', 'Length_Matched']]
+inrix_lines_matched_output.columns = ['CMP_SegID', 'INRIX_SegID', 'Length_Matched']
+
+# Output files
+cmp_segs_prj.to_file(cmp + '_matchedlength_check.shp')
+inrix_lines_matched_output.to_csv('CMP_Segment_INRIX_Links_Correspondence.csv', index=False)
