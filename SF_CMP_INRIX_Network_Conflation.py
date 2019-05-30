@@ -17,7 +17,8 @@ assurance needs to be performed on the conflation results and necessary changes 
 Network Conflation Process Memo.docx for more detailed discussions.
 
 USAGE:
-The script should be placed under the same folder with input files. Use python SF_CMP_INRIX_Network_Conflation.py to run the script.
+To use the script, place the script under the same folder with input files and run with following command: 
+python SF_CMP_INRIX_Network_Conflation.py
 '''
 
 
