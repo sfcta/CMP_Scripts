@@ -180,19 +180,8 @@ def los_1985(cls, spd):
 
 # LOS function using 2000 HCM
 def los_2000(cls, spd):
-    if cls == 'Fwy':  # Freeway
-        if spd >=60:
-            return 'A'
-        elif spd >=55:
-            return 'B'
-        elif spd >=49:
-            return 'C'     
-        elif spd >=41:
-            return 'D'
-        elif spd >=30:
-            return 'E'
-        elif (spd>0) and (spd<30):
-            return 'F'
+    if cls == 'Fwy':  # Freeway, no HCM2000 LOS correspondence 
+        return ' '
     elif cls =='1':  # Arterial Class I
         if spd > 42:
             return 'A'
