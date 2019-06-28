@@ -8,6 +8,9 @@ import dask.distributed
 import warnings
 warnings.filterwarnings("ignore")
 
+#Minimum sample size requirement
+ss_threshold = 180 # from last cycle
+
 # Input CMP segment shapefile
 cmp_name = 'S:/CMP/Network Conflation/cmp_roadway_segments.shp'
 cmp_segs=gp.read_file(cmp_name)
@@ -16,7 +19,7 @@ cmp_segs=gp.read_file(cmp_name)
 wgs84 = {'proj': 'longlat', 'ellps': 'WGS84', 'datum': 'WGS84', 'no_defs': True}
 
 # Get CMP and INRIX correspondence table
-conflation = pd.read_csv('Z:/SF_CMP/INRIX Data/NetworkConflation_CCL/CMP_Segment_INRIX_Links_Correspondence.csv')
+conflation = pd.read_csv('S:/CMP/Network Conflation//CMP_Segment_INRIX_Links_Correspondence.csv')
 
 conf_len=conflation.groupby('CMP_SegID').Length_Matched.sum().reset_index()
 conf_len.columns = ['CMP_SegID', 'CMP_Length']
@@ -71,79 +74,10 @@ cmp_am = pd.merge(cmp_am, conf_len, on='CMP_SegID', how='left')
 cmp_am['Speed'] = cmp_am['Length_Matched']/cmp_am['TT']
 cmp_am['SpatialCov'] = 100*cmp_am['Length_Matched']/cmp_am['CMP_Length']  #Spatial coverage 
 
-# Calculate AM average speed and sample size with 99% spatial coverage requirement
-cmp_am_pcnt99 = cmp_am[cmp_am['SpatialCov']>=99].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
-                                                                           'Length_Matched': 'sum'}).reset_index()
-cmp_am_pcnt99.columns = ['CMP_SegID', 'AM_SS_P99', 'AM_TT_P99', 'AM_Len_P99']
-cmp_am_pcnt99['AM_Spd_P99'] = round(cmp_am_pcnt99['AM_Len_P99']/cmp_am_pcnt99['AM_TT_P99'],3)
-
-# Calculate AM average speed and sample size with 70% spatial coverage requirement
-cmp_am_pcnt70 = cmp_am[cmp_am['SpatialCov']>=70].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
-                                                                           'Length_Matched': 'sum'}).reset_index()
-cmp_am_pcnt70.columns = ['CMP_SegID', 'AM_SS_P70', 'AM_TT_P70', 'AM_Len_P70']
-cmp_am_pcnt70['AM_Spd_P70'] = round(cmp_am_pcnt70['AM_Len_P70']/cmp_am_pcnt70['AM_TT_P70'],3)
-
-
 cmp_pm = df_cmp_pm.groupby(['CMP_SegID', 'Date_Time']).agg({'Length_Matched': 'sum', 'TT': 'sum'}).reset_index().compute()
 cmp_pm = pd.merge(cmp_pm, conf_len, on='CMP_SegID', how='left')
 cmp_pm['Speed'] = cmp_pm['Length_Matched']/cmp_pm['TT']
 cmp_pm['SpatialCov'] = 100*cmp_pm['Length_Matched']/cmp_pm['CMP_Length']
-
-# Calculate PM average speed and sample size with 99% spatial coverage requirement
-cmp_pm_pcnt99 = cmp_pm[cmp_pm['SpatialCov']>=99].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
-                                                                           'Length_Matched': 'sum'}).reset_index()
-cmp_pm_pcnt99.columns = ['CMP_SegID', 'PM_SS_P99', 'PM_TT_P99', 'PM_Len_P99']
-cmp_pm_pcnt99['PM_Spd_P99'] = round(cmp_pm_pcnt99['PM_Len_P99']/cmp_pm_pcnt99['PM_TT_P99'],3)
-
-# Calculate PM average speed and sample size with 70% spatial coverage requirement
-cmp_pm_pcnt70 = cmp_pm[cmp_pm['SpatialCov']>=70].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
-                                                                           'Length_Matched': 'sum'}).reset_index()
-cmp_pm_pcnt70.columns = ['CMP_SegID', 'PM_SS_P70', 'PM_TT_P70', 'PM_Len_P70']
-cmp_pm_pcnt70['PM_Spd_P70'] = round(cmp_pm_pcnt70['PM_Len_P70']/cmp_pm_pcnt70['PM_TT_P70'],3)
-
-# Combine calculation results into one file
-cmp_segs = cmp_segs.merge(cmp_am_pcnt99, left_on='cmp_segid', right_on='CMP_SegID', how='left')
-cmp_segs = cmp_segs.merge(cmp_am_pcnt70, left_on='cmp_segid', right_on='CMP_SegID', how='left')
-cmp_segs = cmp_segs.merge(cmp_pm_pcnt99, left_on='cmp_segid', right_on='CMP_SegID', how='left')
-cmp_segs = cmp_segs.merge(cmp_pm_pcnt70, left_on='cmp_segid', right_on='CMP_SegID', how='left')
-
-# Decide whether to relax spatial requirement based on minimum sample size of 180 from last CMP cycle
-cmp_segs['AM_Speed']=np.where(pd.isnull(cmp_segs['AM_SS_P70']), None,
-                              np.where(cmp_segs['AM_SS_P99']<180, 
-                                       np.where(cmp_segs['AM_SS_P70']<180, None, cmp_segs['AM_Spd_P70']),
-                                       cmp_segs['AM_Spd_P99']))
-
-cmp_segs['AM_Samples']=np.where(pd.isnull(cmp_segs['AM_SS_P70']), 0,
-                              np.where(cmp_segs['AM_SS_P99']<180, 
-                                       np.where(cmp_segs['AM_SS_P70']<180, 0, cmp_segs['AM_SS_P70']),
-                                       cmp_segs['AM_SS_P99']))
-cmp_segs['AM_Spatial']=np.where(pd.isnull(cmp_segs['AM_SS_P70']), 'No Samples',
-                              np.where(cmp_segs['AM_SS_P99']<180, 
-                                       np.where(cmp_segs['AM_SS_P70']<180, 'No Samples', '70%'),
-                                       '99%'))
-cmp_segs['AM_Source']=np.where(pd.isnull(cmp_segs['AM_SS_P70']), 'Floating Car',
-                              np.where(cmp_segs['AM_SS_P99']<180, 
-                                       np.where(cmp_segs['AM_SS_P70']<180, 'Floating Car', 'INRIX'),
-                                       'INRIX'))
-
-cmp_segs['PM_Speed']=np.where(pd.isnull(cmp_segs['PM_SS_P70']), None,
-                              np.where(cmp_segs['PM_SS_P99']<180, 
-                                       np.where(cmp_segs['PM_SS_P70']<180, None, cmp_segs['PM_Spd_P70']),
-                                       cmp_segs['PM_Spd_P99']))
-
-cmp_segs['PM_Samples']=np.where(pd.isnull(cmp_segs['PM_SS_P70']), 0,
-                              np.where(cmp_segs['PM_SS_P99']<180, 
-                                       np.where(cmp_segs['PM_SS_P70']<180, 0, cmp_segs['PM_SS_P70']),
-                                       cmp_segs['PM_SS_P99']))
-cmp_segs['PM_Spatial']=np.where(pd.isnull(cmp_segs['PM_SS_P70']), 'No Samples',
-                              np.where(cmp_segs['PM_SS_P99']<180, 
-                                       np.where(cmp_segs['PM_SS_P70']<180, 'No Samples', '70%'),
-                                       '99%'))
-cmp_segs['PM_Source']=np.where(pd.isnull(cmp_segs['PM_SS_P70']), 'Floating Car',
-                              np.where(cmp_segs['PM_SS_P99']<180, 
-                                       np.where(cmp_segs['PM_SS_P70']<180, 'Floating Car', 'INRIX'),
-                                       'INRIX'))
-
 
 # LOS function using 1985 HCM
 def los_1985(cls, spd):
@@ -262,27 +196,180 @@ def los_2000(cls, spd):
             elif (spd>0) and (spd<=7):
                 return 'F'
 
+# 99% spatial coverage 
+cmp_am_agg = cmp_am[cmp_am['SpatialCov']>=99].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_am_agg.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_am_agg['avg_speed'] = round(cmp_am_agg['Len']/cmp_am_agg['TT'],3)
+cmp_am_agg = cmp_am_agg[cmp_am_agg['sample_size']>=ss_threshold]
+
+# 95% spatial coverage 
+cmp_am_pcnt95 = cmp_am[(~cmp_am['CMP_SegID'].isin(cmp_am_agg['cmp_id'])) & (cmp_am['SpatialCov']>=95)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_am_pcnt95.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_am_pcnt95['avg_speed'] = round(cmp_am_pcnt95['Len']/cmp_am_pcnt95['TT'],3)
+cmp_am_pcnt95 = cmp_am_pcnt95[cmp_am_pcnt95['sample_size']>=ss_threshold]
+if len(cmp_am_pcnt95)>0:
+    cmp_am_pcnt95['comment'] = 'Calculation performed on 95% or greater of length'
+    cmp_am_agg = cmp_am_agg.append(cmp_am_pcnt95, ignore_index=True)
+
+# 90% spatial coverage 
+cmp_am_pcnt90 = cmp_am[(~cmp_am['CMP_SegID'].isin(cmp_am_agg['cmp_id'])) & (cmp_am['SpatialCov']>=90)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_am_pcnt90.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_am_pcnt90['avg_speed'] = round(cmp_am_pcnt90['Len']/cmp_am_pcnt90['TT'],3)
+cmp_am_pcnt90 = cmp_am_pcnt90[cmp_am_pcnt90['sample_size']>=ss_threshold]
+if len(cmp_am_pcnt90)>0:
+    cmp_am_pcnt90['comment'] = 'Calculation performed on 90% or greater of length'
+    cmp_am_agg = cmp_am_agg.append(cmp_am_pcnt90, ignore_index=True)
+    
+# 85% spatial coverage 
+cmp_am_pcnt85 = cmp_am[(~cmp_am['CMP_SegID'].isin(cmp_am_agg['cmp_id'])) & (cmp_am['SpatialCov']>=85)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_am_pcnt85.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_am_pcnt85['avg_speed'] = round(cmp_am_pcnt85['Len']/cmp_am_pcnt85['TT'],3)
+cmp_am_pcnt85 = cmp_am_pcnt85[cmp_am_pcnt85['sample_size']>=ss_threshold]
+if len(cmp_am_pcnt85)>0:
+    cmp_am_pcnt85['comment'] = 'Calculation performed on 85% or greater of length'
+    cmp_am_agg = cmp_am_agg.append(cmp_am_pcnt85, ignore_index=True)
+
+# 80% spatial coverage 
+cmp_am_pcnt80 = cmp_am[(~cmp_am['CMP_SegID'].isin(cmp_am_agg['cmp_id'])) & (cmp_am['SpatialCov']>=80)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_am_pcnt80.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_am_pcnt80['avg_speed'] = round(cmp_am_pcnt80['Len']/cmp_am_pcnt80['TT'],3)
+cmp_am_pcnt80 = cmp_am_pcnt80[cmp_am_pcnt80['sample_size']>=ss_threshold]
+if len(cmp_am_pcnt80)>0:
+    cmp_am_pcnt80['comment'] = 'Calculation performed on 80% or greater of length'
+    cmp_am_agg = cmp_am_agg.append(cmp_am_pcnt80, ignore_index=True)
+
+# 75% spatial coverage 
+cmp_am_pcnt75 = cmp_am[(~cmp_am['CMP_SegID'].isin(cmp_am_agg['cmp_id'])) & (cmp_am['SpatialCov']>=75)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_am_pcnt75.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_am_pcnt75['avg_speed'] = round(cmp_am_pcnt75['Len']/cmp_am_pcnt75['TT'],3)
+cmp_am_pcnt75 = cmp_am_pcnt75[cmp_am_pcnt75['sample_size']>=ss_threshold]
+if len(cmp_am_pcnt75)>0:
+    cmp_am_pcnt75['comment'] = 'Calculation performed on 75% or greater of length'
+    cmp_am_agg = cmp_am_agg.append(cmp_am_pcnt75, ignore_index=True)
+    
+    
+# 70% spatial coverage 
+cmp_am_pcnt70 = cmp_am[(~cmp_am['CMP_SegID'].isin(cmp_am_agg['cmp_id'])) & (cmp_am['SpatialCov']>=70)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_am_pcnt70.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_am_pcnt70['avg_speed'] = round(cmp_am_pcnt70['Len']/cmp_am_pcnt70['TT'],3)
+cmp_am_pcnt70 = cmp_am_pcnt70[cmp_am_pcnt70['sample_size']>=ss_threshold]
+if len(cmp_am_pcnt70)>0:
+    cmp_am_pcnt70['comment'] = 'Calculation performed on 70% or greater of length'
+    cmp_am_agg = cmp_am_agg.append(cmp_am_pcnt70, ignore_index=True)
+    
+cmp_am_agg['year']=2019
+cmp_am_agg['period']='AM'
+cmp_am_agg['source']='INRIX'
+    
 # Assign LOS based on 1985 and 2000 HCM
-cmp_segs['AM_LOS_85'] = cmp_segs.apply(lambda x: los_1985(x.cls_hcm85, x.AM_Speed), axis=1)
-cmp_segs['AM_LOS_00'] = cmp_segs.apply(lambda x: los_2000(x.cls_hcm00, x.AM_Speed), axis=1)
-cmp_segs['PM_LOS_85'] = cmp_segs.apply(lambda x: los_1985(x.cls_hcm85, x.PM_Speed), axis=1)
-cmp_segs['PM_LOS_00'] = cmp_segs.apply(lambda x: los_2000(x.cls_hcm00, x.PM_Speed), axis=1)
+cmp_am_agg = pd.merge(cmp_am_agg, cmp_segs[['cmp_segid', 'cls_hcm85', 'cls_hcm00']], left_on='cmp_id', right_on='cmp_segid', how='left')
+cmp_am_agg['los_hcm85'] = cmp_am_agg.apply(lambda x: los_1985(x.cls_hcm85, x.avg_speed), axis=1)
+cmp_am_agg['los_hcm00'] = cmp_am_agg.apply(lambda x: los_2000(x.cls_hcm00, x.avg_speed), axis=1)
 
-# Save the intermediate results in shp format
-cmp_segs = cmp_segs.to_crs(wgs84)
-cmp_segs.to_file('S:/CMP/Auto LOS/cmp_roadway_segments_auto_los.shp')
+# Floating car run segments
+fcr_segs_am = cmp_segs[~cmp_segs['cmp_segid'].isin(cmp_am_agg['cmp_id'])].cmp_segid.tolist()
+cmp_am_fcr = pd.DataFrame(fcr_segs_am)
+cmp_am_fcr.columns=['cmp_id']
+cmp_am_fcr['year']=2019
+cmp_am_fcr['period']='AM'
+cmp_am_fcr['source']='Floating Car'
 
-# Organize the results in 2017 LOS format
-cmp_segs['Year']=2019
+cmp_am_agg = cmp_am_agg.append(cmp_am_fcr, ignore_index=True)
+cmp_am_agg = cmp_am_agg[['cmp_id', 'year', 'source', 'period', 'avg_speed', 'los_hcm85', 'los_hcm00', 'sample_size', 'comment']]
 
-cmp_segs_am = cmp_segs[['cmp_segid', 'Year', 'AM_Source', 'AM_Speed', 'AM_LOS_85', 'AM_LOS_00', 'AM_Samples', 'AM_Spatial']]
-cmp_segs_am.columns = ['cmp_segid', 'year', 'source', 'avg_Speed', 'los_hcm85', 'los_hcm00', 'sample_size', 'comment']
-cmp_segs_am['period']='AM'
 
-cmp_segs_pm = cmp_segs[['cmp_segid', 'Year', 'PM_Source', 'PM_Speed', 'PM_LOS_85', 'PM_LOS_00', 'PM_Samples', 'PM_Spatial']]
-cmp_segs_pm.columns = ['cmp_segid', 'year', 'source', 'avg_Speed', 'los_hcm85', 'los_hcm00', 'sample_size', 'comment']
-cmp_segs_pm['period']='PM'
+# 99% spatial coverage 
+cmp_pm_agg = cmp_pm[cmp_pm['SpatialCov']>=99].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_pm_agg.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_pm_agg['avg_speed'] = round(cmp_pm_agg['Len']/cmp_pm_agg['TT'],3)
+cmp_pm_agg = cmp_pm_agg[cmp_pm_agg['sample_size']>=ss_threshold]
 
-cmp_segs_csv = cmp_segs_am.append(cmp_segs_pm, ignore_index=True)
-cmp_segs_csv = cmp_segs_csv[['cmp_segid', 'year', 'period', 'source', 'avg_Speed', 'los_hcm85', 'los_hcm00', 'sample_size', 'comment']]
-cmp_segs_csv.to_csv('S:/CMP/Auto LOS/CMP 2019 Auto LOS v1.csv', index=False)
+# 95% spatial coverage 
+cmp_pm_pcnt95 = cmp_pm[(~cmp_pm['CMP_SegID'].isin(cmp_pm_agg['cmp_id'])) & (cmp_pm['SpatialCov']>=95)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_pm_pcnt95.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_pm_pcnt95['avg_speed'] = round(cmp_pm_pcnt95['Len']/cmp_pm_pcnt95['TT'],3)
+cmp_pm_pcnt95 = cmp_pm_pcnt95[cmp_pm_pcnt95['sample_size']>=ss_threshold]
+if len(cmp_pm_pcnt95)>0:
+    cmp_pm_pcnt95['comment'] = 'Calculation performed on 95% or greater of length'
+    cmp_pm_agg = cmp_pm_agg.append(cmp_pm_pcnt95, ignore_index=True)
+
+# 90% spatial coverage 
+cmp_pm_pcnt90 = cmp_pm[(~cmp_pm['CMP_SegID'].isin(cmp_pm_agg['cmp_id'])) & (cmp_pm['SpatialCov']>=90)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_pm_pcnt90.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_pm_pcnt90['avg_speed'] = round(cmp_pm_pcnt90['Len']/cmp_pm_pcnt90['TT'],3)
+cmp_pm_pcnt90 = cmp_pm_pcnt90[cmp_pm_pcnt90['sample_size']>=ss_threshold]
+if len(cmp_pm_pcnt90)>0:
+    cmp_pm_pcnt90['comment'] = 'Calculation performed on 90% or greater of length'
+    cmp_pm_agg = cmp_pm_agg.append(cmp_pm_pcnt90, ignore_index=True)
+
+# 85% spatial coverage 
+cmp_pm_pcnt85 = cmp_pm[(~cmp_pm['CMP_SegID'].isin(cmp_pm_agg['cmp_id'])) & (cmp_pm['SpatialCov']>=85)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_pm_pcnt85.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_pm_pcnt85['avg_speed'] = round(cmp_pm_pcnt85['Len']/cmp_pm_pcnt85['TT'],3)
+cmp_pm_pcnt85 = cmp_pm_pcnt85[cmp_pm_pcnt85['sample_size']>=ss_threshold]
+if len(cmp_pm_pcnt85)>0:
+    cmp_pm_pcnt85['comment'] = 'Calculation performed on 85% or greater of length'
+    cmp_pm_agg = cmp_pm_agg.append(cmp_pm_pcnt85, ignore_index=True)
+
+# 80% spatial coverage 
+cmp_pm_pcnt80 = cmp_pm[(~cmp_pm['CMP_SegID'].isin(cmp_pm_agg['cmp_id'])) & (cmp_pm['SpatialCov']>=80)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_pm_pcnt80.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_pm_pcnt80['avg_speed'] = round(cmp_pm_pcnt80['Len']/cmp_pm_pcnt80['TT'],3)
+cmp_pm_pcnt80 = cmp_pm_pcnt80[cmp_pm_pcnt80['sample_size']>=ss_threshold]
+if len(cmp_pm_pcnt80)>0:
+    cmp_pm_pcnt80['comment'] = 'Calculation performed on 80% or greater of length'
+    cmp_pm_agg = cmp_pm_agg.append(cmp_pm_pcnt80, ignore_index=True)
+
+# 75% spatial coverage 
+cmp_pm_pcnt75 = cmp_pm[(~cmp_pm['CMP_SegID'].isin(cmp_pm_agg['cmp_id'])) & (cmp_pm['SpatialCov']>=75)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_pm_pcnt75.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_pm_pcnt75['avg_speed'] = round(cmp_pm_pcnt75['Len']/cmp_pm_pcnt75['TT'],3)
+cmp_pm_pcnt75 = cmp_pm_pcnt75[cmp_pm_pcnt75['sample_size']>=ss_threshold]
+if len(cmp_pm_pcnt75)>0:
+    cmp_pm_pcnt75['comment'] = 'Calculation performed on 75% or greater of length'
+    cmp_pm_agg = cmp_pm_agg.append(cmp_pm_pcnt75, ignore_index=True)
+
+# 70% spatial coverage 
+cmp_pm_pcnt70 = cmp_pm[(~cmp_pm['CMP_SegID'].isin(cmp_pm_agg['cmp_id'])) & (cmp_pm['SpatialCov']>=70)].groupby('CMP_SegID').agg({'TT': ['count', 'sum'],
+                                                                           'Length_Matched': 'sum'}).reset_index()
+cmp_pm_pcnt70.columns = ['cmp_id', 'sample_size', 'TT', 'Len']
+cmp_pm_pcnt70['avg_speed'] = round(cmp_pm_pcnt70['Len']/cmp_pm_pcnt70['TT'],3)
+cmp_pm_pcnt70 = cmp_pm_pcnt70[cmp_pm_pcnt70['sample_size']>=ss_threshold]
+if len(cmp_pm_pcnt70)>0:
+    cmp_pm_pcnt70['comment'] = 'Calculation performed on 70% or greater of length'
+    cmp_pm_agg = cmp_pm_agg.append(cmp_pm_pcnt70, ignore_index=True)
+
+cmp_pm_agg['year']=2019
+cmp_pm_agg['period']='PM'
+cmp_pm_agg['source']='INRIX'
+
+cmp_pm_agg = pd.merge(cmp_pm_agg, cmp_segs[['cmp_segid', 'cls_hcm85', 'cls_hcm00']], left_on='cmp_id', right_on='cmp_segid', how='left')
+cmp_pm_agg['los_hcm85'] = cmp_pm_agg.apply(lambda x: los_1985(x.cls_hcm85, x.avg_speed), axis=1)
+cmp_pm_agg['los_hcm00'] = cmp_pm_agg.apply(lambda x: los_2000(x.cls_hcm00, x.avg_speed), axis=1)
+
+# Floating car run segments
+fcr_segs_pm = cmp_segs[~cmp_segs['cmp_segid'].isin(cmp_pm_agg['cmp_id'])].cmp_segid.tolist()
+cmp_pm_fcr = pd.DataFrame(fcr_segs_pm)
+cmp_pm_fcr.columns=['cmp_id']
+cmp_pm_fcr['year']=2019
+cmp_pm_fcr['period']='PM'
+cmp_pm_fcr['source']='Floating Car'
+
+cmp_pm_agg = cmp_pm_agg.append(cmp_pm_fcr, ignore_index=True)
+cmp_pm_agg = cmp_pm_agg[['cmp_id', 'year', 'source', 'period', 'avg_speed', 'los_hcm85', 'los_hcm00', 'sample_size', 'comment']]
+
+cmp_segs_los = cmp_am_agg.append(cmp_pm_agg, ignore_index=True)
+cmp_segs_los.to_csv('S:/CMP/Auto LOS/CMP 2019 Auto LOS v1.csv', index=False)
