@@ -108,132 +108,159 @@ cmp_segs = cmp_segs.merge(cmp_pm_pcnt99, left_on='cmp_segid', right_on='CMP_SegI
 cmp_segs = cmp_segs.merge(cmp_pm_pcnt70, left_on='cmp_segid', right_on='CMP_SegID', how='left')
 
 # Decide whether to relax spatial requirement based on minimum sample size of 180 from last CMP cycle
-cmp_segs['AM_Speed']=np.where(cmp_segs['AM_SS_P99']<180, 
-                              np.where(cmp_segs['AM_SS_P70']<180, None,
-                                       cmp_segs['AM_Spd_P70']),
-                              cmp_segs['AM_Spd_P99'])
-cmp_segs['AM_Samples']=np.where(cmp_segs['AM_SS_P99']<180, cmp_segs['AM_SS_P70'], cmp_segs['AM_SS_P99'])
-cmp_segs['AM_Spatial']=np.where(cmp_segs['AM_SS_P99']<180, '70%', '99%')
+cmp_segs['AM_Speed']=np.where(pd.isnull(cmp_segs['AM_SS_P70']), None,
+                              np.where(cmp_segs['AM_SS_P99']<180, 
+                                       np.where(cmp_segs['AM_SS_P70']<180, None, cmp_segs['AM_Spd_P70']),
+                                       cmp_segs['AM_Spd_P99']))
 
-cmp_segs['PM_Speed']=np.where(cmp_segs['PM_SS_P99']<180, 
-                              np.where(cmp_segs['PM_SS_P70']<180, None,
-                                       cmp_segs['PM_Spd_P70']),
-                              cmp_segs['PM_Spd_P99'])
-cmp_segs['PM_Samples']=np.where(cmp_segs['PM_SS_P99']<180, cmp_segs['PM_SS_P70'], cmp_segs['PM_SS_P99'])
-cmp_segs['PM_Spatial']=np.where(cmp_segs['PM_SS_P99']<180, '70%', '99%')
+cmp_segs['AM_Samples']=np.where(pd.isnull(cmp_segs['AM_SS_P70']), 0,
+                              np.where(cmp_segs['AM_SS_P99']<180, 
+                                       np.where(cmp_segs['AM_SS_P70']<180, 0, cmp_segs['AM_SS_P70']),
+                                       cmp_segs['AM_SS_P99']))
+cmp_segs['AM_Spatial']=np.where(pd.isnull(cmp_segs['AM_SS_P70']), 'No Samples',
+                              np.where(cmp_segs['AM_SS_P99']<180, 
+                                       np.where(cmp_segs['AM_SS_P70']<180, 'No Samples', '70%'),
+                                       '99%'))
+cmp_segs['AM_Source']=np.where(pd.isnull(cmp_segs['AM_SS_P70']), 'Floating Car',
+                              np.where(cmp_segs['AM_SS_P99']<180, 
+                                       np.where(cmp_segs['AM_SS_P70']<180, 'Floating Car', 'INRIX'),
+                                       'INRIX'))
+
+cmp_segs['PM_Speed']=np.where(pd.isnull(cmp_segs['PM_SS_P70']), None,
+                              np.where(cmp_segs['PM_SS_P99']<180, 
+                                       np.where(cmp_segs['PM_SS_P70']<180, None, cmp_segs['PM_Spd_P70']),
+                                       cmp_segs['PM_Spd_P99']))
+
+cmp_segs['PM_Samples']=np.where(pd.isnull(cmp_segs['PM_SS_P70']), 0,
+                              np.where(cmp_segs['PM_SS_P99']<180, 
+                                       np.where(cmp_segs['PM_SS_P70']<180, 0, cmp_segs['PM_SS_P70']),
+                                       cmp_segs['PM_SS_P99']))
+cmp_segs['PM_Spatial']=np.where(pd.isnull(cmp_segs['PM_SS_P70']), 'No Samples',
+                              np.where(cmp_segs['PM_SS_P99']<180, 
+                                       np.where(cmp_segs['PM_SS_P70']<180, 'No Samples', '70%'),
+                                       '99%'))
+cmp_segs['PM_Source']=np.where(pd.isnull(cmp_segs['PM_SS_P70']), 'Floating Car',
+                              np.where(cmp_segs['PM_SS_P99']<180, 
+                                       np.where(cmp_segs['PM_SS_P70']<180, 'Floating Car', 'INRIX'),
+                                       'INRIX'))
 
 
 # LOS function using 1985 HCM
 def los_1985(cls, spd):
-    if cls == 'Fwy':   # Freeway
-        if spd >=60:
-            return 'A'
-        elif spd >=55:
-            return 'B'
-        elif spd >=49:
-            return 'C'     
-        elif spd >=41:
-            return 'D'
-        elif spd >=30:
-            return 'E'
-        elif (spd>0) and (spd<30):
-            return 'F'
-    elif cls =='1':  # Arterial Class I
-        if spd >=35:
-            return 'A'
-        elif spd >=28:
-            return 'B'
-        elif spd >=22:
-            return 'C'     
-        elif spd >=17:
-            return 'D'
-        elif spd >=13:
-            return 'E'
-        elif (spd>0) and (spd<13):
-            return 'F'
-    elif cls =='2':  # Arterial Class II
-        if spd >=30:
-            return 'A'
-        elif spd >=24:
-            return 'B'
-        elif spd >=18:
-            return 'C'     
-        elif spd >=14:
-            return 'D'
-        elif spd >=10:
-            return 'E'
-        elif (spd>0) and (spd<10):
-            return 'F'
-    elif cls =='3':  # Arterial Class III
-        if spd >=25:
-            return 'A'
-        elif spd >=19:
-            return 'B'
-        elif spd >=13:
-            return 'C'     
-        elif spd >=9:
-            return 'D'
-        elif spd >=7:
-            return 'E'
-        elif (spd>0) and (spd<7):
-            return 'F'
-
-# LOS function using 2000 HCM
-def los_2000(cls, spd):
-    if cls == 'Fwy':  # Freeway, no HCM2000 LOS correspondence 
+    if spd is None:
         return ' '
-    elif cls =='1':  # Arterial Class I
-        if spd > 42:
-            return 'A'
-        elif spd > 34:
-            return 'B'
-        elif spd > 27:
-            return 'C'     
-        elif spd > 21:
-            return 'D'
-        elif spd > 16:
-            return 'E'
-        elif (spd>0) and (spd<=16):
-            return 'F'
-    if cls =='2':   # Arterial Class II
-        if spd > 35:
-            return 'A'
-        elif spd > 28:
-            return 'B'
-        elif spd > 22:
-            return 'C'     
-        elif spd > 17:
-            return 'D'
-        elif spd > 13:
-            return 'E'
-        elif (spd>0) and (spd<=13):
-            return 'F'
-    elif cls =='3':  # Arterial Class III
-        if spd > 30:
-            return 'A'
-        elif spd > 24:
-            return 'B'
-        elif spd > 18:
-            return 'C'     
-        elif spd > 14:
-            return 'D'
-        elif spd > 10:
-            return 'E'
-        elif (spd>0) and (spd<=10):
-            return 'F'
-    elif cls =='4':  # Arterial Class IV
-        if spd > 25:
-            return 'A'
-        elif spd > 19:
-            return 'B'
-        elif spd > 13:
-            return 'C'     
-        elif spd > 9:
-            return 'D'
-        elif spd > 7:
-            return 'E'
-        elif (spd>0) and (spd<=7):
-            return 'F'
+    else:
+        if cls == 'Fwy':   # Freeway
+            if spd >=60:
+                return 'A'
+            elif spd >=55:
+                return 'B'
+            elif spd >=49:
+                return 'C'     
+            elif spd >=41:
+                return 'D'
+            elif spd >=30:
+                return 'E'
+            elif (spd>0) and (spd<30):
+                return 'F'
+        elif cls =='1':  # Arterial Class I
+            if spd >=35:
+                return 'A'
+            elif spd >=28:
+                return 'B'
+            elif spd >=22:
+                return 'C'     
+            elif spd >=17:
+                return 'D'
+            elif spd >=13:
+                return 'E'
+            elif (spd>0) and (spd<13):
+                return 'F'
+        elif cls =='2':  # Arterial Class II
+            if spd >=30:
+                return 'A'
+            elif spd >=24:
+                return 'B'
+            elif spd >=18:
+                return 'C'     
+            elif spd >=14:
+                return 'D'
+            elif spd >=10:
+                return 'E'
+            elif (spd>0) and (spd<10):
+                return 'F'
+        elif cls =='3':  # Arterial Class III
+            if spd >=25:
+                return 'A'
+            elif spd >=19:
+                return 'B'
+            elif spd >=13:
+                return 'C'     
+            elif spd >=9:
+                return 'D'
+            elif spd >=7:
+                return 'E'
+            elif (spd>0) and (spd<7):
+                return 'F'
+
+def los_2000(cls, spd):
+    if spd is None:
+        return ' '
+    else:
+        if cls == 'Fwy':  # Freeway
+            return ' '
+        elif cls =='1':  # Arterial Class I
+            if spd > 42:
+                return 'A'
+            elif spd > 34:
+                return 'B'
+            elif spd > 27:
+                return 'C'     
+            elif spd > 21:
+                return 'D'
+            elif spd > 16:
+                return 'E'
+            elif (spd>0) and (spd<=16):
+                return 'F'
+        if cls =='2':   # Arterial Class II
+            if spd > 35:
+                return 'A'
+            elif spd > 28:
+                return 'B'
+            elif spd > 22:
+                return 'C'     
+            elif spd > 17:
+                return 'D'
+            elif spd > 13:
+                return 'E'
+            elif (spd>0) and (spd<=13):
+                return 'F'
+        elif cls =='3':  # Arterial Class III
+            if spd > 30:
+                return 'A'
+            elif spd > 24:
+                return 'B'
+            elif spd > 18:
+                return 'C'     
+            elif spd > 14:
+                return 'D'
+            elif spd > 10:
+                return 'E'
+            elif (spd>0) and (spd<=10):
+                return 'F'
+        elif cls =='4':  # Arterial Class IV
+            if spd > 25:
+                return 'A'
+            elif spd > 19:
+                return 'B'
+            elif spd > 13:
+                return 'C'     
+            elif spd > 9:
+                return 'D'
+            elif spd > 7:
+                return 'E'
+            elif (spd>0) and (spd<=7):
+                return 'F'
 
 # Assign LOS based on 1985 and 2000 HCM
 cmp_segs['AM_LOS_85'] = cmp_segs.apply(lambda x: los_1985(x.cls_hcm85, x.AM_Speed), axis=1)
@@ -241,6 +268,21 @@ cmp_segs['AM_LOS_00'] = cmp_segs.apply(lambda x: los_2000(x.cls_hcm00, x.AM_Spee
 cmp_segs['PM_LOS_85'] = cmp_segs.apply(lambda x: los_1985(x.cls_hcm85, x.PM_Speed), axis=1)
 cmp_segs['PM_LOS_00'] = cmp_segs.apply(lambda x: los_2000(x.cls_hcm00, x.PM_Speed), axis=1)
 
-# Save the results
+# Save the intermediate results in shp format
 cmp_segs = cmp_segs.to_crs(wgs84)
 cmp_segs.to_file('S:/CMP/Auto LOS/cmp_roadway_segments_auto_los.shp')
+
+# Organize the results in 2017 LOS format
+cmp_segs['Year']=2019
+
+cmp_segs_am = cmp_segs[['cmp_segid', 'Year', 'AM_Source', 'AM_Speed', 'AM_LOS_85', 'AM_LOS_00', 'AM_Samples', 'AM_Spatial']]
+cmp_segs_am.columns = ['cmp_segid', 'year', 'source', 'avg_Speed', 'los_hcm85', 'los_hcm00', 'sample_size', 'comment']
+cmp_segs_am['period']='AM'
+
+cmp_segs_pm = cmp_segs[['cmp_segid', 'Year', 'PM_Source', 'PM_Speed', 'PM_LOS_85', 'PM_LOS_00', 'PM_Samples', 'PM_Spatial']]
+cmp_segs_pm.columns = ['cmp_segid', 'year', 'source', 'avg_Speed', 'los_hcm85', 'los_hcm00', 'sample_size', 'comment']
+cmp_segs_pm['period']='PM'
+
+cmp_segs_csv = cmp_segs_am.append(cmp_segs_pm, ignore_index=True)
+cmp_segs_csv = cmp_segs_csv[['cmp_segid', 'year', 'period', 'source', 'avg_Speed', 'los_hcm85', 'los_hcm00', 'sample_size', 'comment']]
+cmp_segs_csv.to_csv('S:/CMP/Auto LOS/CMP 2019 Auto LOS v1.csv', index=False)
