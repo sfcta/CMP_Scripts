@@ -9,7 +9,8 @@ OUTPUTS:
 1. The average counts by stations and day types at 30-min resolution.
 
 USAGE:
-To use the script, place the script under the S:\CMP\PeMS folder where input files are located and run with the command: python SF_CMP_PeMS_Counts.py.
+To use the script, place the script under the S:\CMP\PeMS folder where input files are located and run with the command: 
+python SF_CMP_PeMS_Counts.py.
 '''
 
 
