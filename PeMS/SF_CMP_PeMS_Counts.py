@@ -1,5 +1,5 @@
 '''
-This script is developed to automatically summarize the PeMS traffic counts by stations and day types, i.e weekdays, Saturdays, and Sundays.
+This script is developed to summarize the PeMS counts by stations and day types, i.e typical weekdays, Saturdays, and Sundays.
 
 INPUTS:
 1. Selected PeMS stations in the San Francisco.
@@ -15,12 +15,10 @@ To use the script, place the script under the S:\CMP\PeMS folder where input fil
 
 import pandas as pd
 import numpy as np
-import geopandas as gp
 import dask.dataframe as dd
 from dask.diagnostics import ProgressBar
 import dask.distributed
 client = dask.distributed.Client()
-pd.options.display.max_columns = None
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -51,7 +49,7 @@ for month in months:
                 filename = 'S:/CMP/PeMS/d04_text_station_5min_2019_04_' + str(day) + '.txt'
             df = dd.read_csv(filename, names = colnames, assume_missing=True)
 			
-			# Query out counts for selected stations
+	    # Query out counts for selected stations
             df_sf_day = df[df['Station'].isin(sf_stations)].compute()
             sf_counts = sf_counts.append(df_sf_day, ignore_index=True)
             
