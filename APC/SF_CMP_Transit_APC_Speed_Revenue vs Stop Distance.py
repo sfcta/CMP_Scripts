@@ -4,14 +4,11 @@ pd.options.display.max_columns = None
 import numpy as np
 import math
 import geopandas as gp
-import fiona
 from shapely.geometry import Point, mapping, LineString
 import dask.dataframe as dd
 from dask.diagnostics import ProgressBar
 import dask.distributed
 from datetime import datetime
-import matplotlib.pyplot as plt
-import time
 import warnings
 warnings.filterwarnings("ignore")
 
