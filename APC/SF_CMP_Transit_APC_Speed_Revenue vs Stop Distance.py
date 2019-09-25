@@ -10,6 +10,7 @@ from dask.diagnostics import ProgressBar
 import dask.distributed
 from datetime import datetime
 import warnings
+import os
 warnings.filterwarnings("ignore")
 
 #Define WGS 1984 coordinate system
@@ -18,16 +19,25 @@ wgs84 = {'proj': 'longlat', 'ellps': 'WGS84', 'datum': 'WGS84', 'no_defs': True}
 #Define NAD 1983 StatePlane California III
 cal3 = {'proj': 'lcc +lat_1=37.06666666666667 +lat_2=38.43333333333333 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000.0000000002', 'ellps': 'GRS80', 'datum': 'NAD83', 'no_defs': True}
 
-directory = 'S:/CMP/Transit/Speed/'
+# UK Paths
+# MAIN_DIR = 'S:/CMP/Transit/Speed'
+# NETCONF_DIR = 'S:/CMP/Network Conflation'
+# APC_FILE = 'S:/CMP/Transit/Speed/APC_2019_SPRING/APC_2019_SPRING.txt'
+
+# SFCTA Paths
+MAIN_DIR = r'Q:\CMP\LOS Monitoring 2019\Transit\Speed'
+NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2019\Network_Conflation'
+APC_FILE = r'Q:\Data\Observed\Transit\Muni\APC\CMP_2019\APC_2019_SPRING.txt'
+
 
 # Convert original coordinate system to state plane
-stops = gp.read_file(directory + 'stops.shp')
+stops = gp.read_file(os.path.join(MAIN_DIR, 'stops.shp'))
 stops = stops.to_crs(cal3)
 stops['stop_name'] = stops['stop_name'].str.lower()
 stops[['street_1','street_2']] = stops.stop_name.str.split('&', expand=True)  #split stop name into operating street and intersecting street
 
 # CMP network
-cmp_segs_org=gp.read_file('S:/CMP/Network Conflation/cmp_roadway_segments.shp')
+cmp_segs_org=gp.read_file(os.path.join(NETCONF_DIR, 'cmp_roadway_segments.shp'))
 cmp_segs_prj = cmp_segs_org.to_crs(cal3)
 cmp_segs_prj['cmp_name'] = cmp_segs_prj['cmp_name'].str.replace('/ ','/')
 cmp_segs_prj['cmp_name'] = cmp_segs_prj['cmp_name'].str.lower()
@@ -35,17 +45,17 @@ cmp_segs_prj['Length'] = cmp_segs_prj.geometry.length
 cmp_segs_prj['Length'] = cmp_segs_prj['Length'] * 3.2808  #meters to feet
 
 # INRIX network
-inrix_net=gp.read_file('S:/CMP/Network Conflation/inrix_xd_sf.shp')
+inrix_net=gp.read_file(os.path.join(NETCONF_DIR, 'inrix_xd_sf.shp'))
 inrix_net['RoadName'] = inrix_net['RoadName'].str.lower()
 
-cmp_inrix_corr = pd.read_csv('S:/CMP/Network Conflation/CMP_Segment_INRIX_Links_Correspondence.csv')
+cmp_inrix_corr = pd.read_csv(os.path.join(NETCONF_DIR, 'CMP_Segment_INRIX_Links_Correspondence.csv'))
 
 # Create a buffer zone for each cmp segment
 ft=160   # According to the memo from last CMP cycle
 mt=round(ft/3.2808,4)
 stops_buffer=stops.copy()
 stops_buffer['geometry'] = stops_buffer.geometry.buffer(mt)
-#stops_buffer.to_file(directory + 'stops_buffer.shp')
+#stops_buffer.to_file(os.path.join(MAIN_DIR, 'stops_buffer.shp'))
 
 # cmp segments intersecting transit stop buffer zone
 cmp_segs_intersect=gp.sjoin(cmp_segs_prj, stops_buffer, op='intersects').reset_index()
@@ -111,7 +121,7 @@ cmp_segs_near = cmp_segs_intersect[cmp_segs_intersect['name_match']==1]
 # Preprocess APC data
 apc_fields = ['EXT_TRIP_ID', 'DIRECTION', 'ACTUAL_DATE', 'VEHICLE_ID', 'CALC_SPEED', 
             'REV_DISTANCE', 'OPEN_DATE_TIME', 'DWELL_TIME', 'CLOSE_DATE_TIME', 'STOPID']
-apc_cmp = pd.read_csv('S:/CMP/Transit/Speed/APC_2019_SPRING/APC_2019_SPRING.txt', sep='\t', usecols=apc_fields)
+apc_cmp = pd.read_csv(APC_FILE, sep='\t', usecols=apc_fields)
 
 
 apc_cmp['Date']=pd.to_datetime(apc_cmp['ACTUAL_DATE'])
@@ -266,7 +276,7 @@ apc_cmp_am = apc_cmp_am.sort_values(by=['EXT_TRIP_ID', 'ACTUAL_DATE', 'VEHICLE_I
 
 print('------------Start processing AM trips------------')
 apc_pairs_am = match_stop_pairs_to_cmp(apc_cmp_am, stops_near_cmp_list, cmp_segs_near, cmp_segs_prj, angle_thrd)
-apc_pairs_am.to_csv('S:/CMP/Transit/Speed/APC_2019_Stop_Pairs_AM_update.csv', index=False)
+apc_pairs_am.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_AM_update.csv'), index=False)
 
 # ## PM 
 apc_cmp_pm = apc_cmp[(apc_cmp['Open_Time_float']<=18.5) & (apc_cmp['Close_Time_float']>=16.5)]
@@ -276,7 +286,7 @@ apc_cmp_pm = apc_cmp_pm.sort_values(by=['EXT_TRIP_ID', 'ACTUAL_DATE', 'VEHICLE_I
 
 print('------------Start processing PM trips------------')
 apc_pairs_pm = match_stop_pairs_to_cmp(apc_cmp_pm, stops_near_cmp_list, cmp_segs_near, cmp_segs_prj, angle_thrd)
-apc_pairs_pm.to_csv('S:/CMP/Transit/Speed/APC_2019_Stop_Pairs_PM_update.csv', index=False)
+apc_pairs_pm.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_PM_update.csv'), index=False)
 
 
 # ## Stop and Segment Matching 
@@ -297,11 +307,11 @@ stop_seg_pm = stop_seg_pm_1.append(stop_seg_pm_2, ignore_index=False)
 stop_seg_match = stop_seg_am.append(stop_seg_pm, ignore_index=False)
 stop_seg_match = stop_seg_match.drop_duplicates(subset=['stop_id','cmp_segid']).reset_index()
 
-stop_seg_match.to_csv('S:/CMP/Transit/Speed/transit_stop_cmp_segment_match.csv', index=False)
+stop_seg_match.to_csv(os.path.join(MAIN_DIR, 'transit_stop_cmp_segment_match.csv'), index=False)
 
 stop_cmp_match = stops.merge(stop_seg_match, on='stop_id')
 stop_cmp_match.to_crs(wgs84)
-stop_cmp_match.to_file(directory + 'transit_stop_cmp_segment_match_update.shp')
+stop_cmp_match.to_file(os.path.join(MAIN_DIR, 'transit_stop_cmp_segment_match_update.shp'))
 
 stop_cmp_match['cmp_segid'] = stop_cmp_match['cmp_segid'].astype(int)
 
@@ -352,7 +362,7 @@ covered_stop_pairs_am_unique['dist'] = abs(covered_stop_pairs_am_unique['next_st
 
 
 # ### Manually Matched Pairs 
-overlap_pairs = pd.read_csv('S:/CMP/Transit/Speed/Postprocessing_overlapping_transit_segments.csv')
+overlap_pairs = pd.read_csv(os.path.join(MAIN_DIR, 'Postprocessing_overlapping_transit_segments.csv'))
 
 pair_cnt = len(apc_pairs_am)
 for cur_stop_idx in range(len(overlap_pairs)):
@@ -425,7 +435,7 @@ covered_cmp_len_ratio_am['len_ratio'] = round(100 * covered_cmp_len_ratio_am['pa
 apc_pairs_am['speed_rev_dis'] = 3600* apc_pairs_am['cur_next_rev_dis']/apc_pairs_am['cur_next_time']
 apc_pairs_am['speed_loc_dis'] = 3600* apc_pairs_am['cur_next_loc_dis']/apc_pairs_am['cur_next_time']
 
-apc_pairs_am.to_csv('S:/CMP/Transit/Speed/APC_2019_Stop_Pairs_AM_update_manual.csv', index=False)
+apc_pairs_am.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_AM_update_manual.csv'), index=False)
 
 apc_pairs_am_clean = apc_pairs_am[apc_pairs_am['cur_stop_dwell_time']<180]
 apc_cmp_speeds_am = apc_pairs_am_clean.groupby(['cmp_segid']).agg({'cur_next_loc_dis': 'sum',
@@ -548,7 +558,7 @@ for cur_stop_idx in range(len(overlap_pairs)):
 
 apc_pairs_pm['speed_rev_dis'] = 3600* apc_pairs_pm['cur_next_rev_dis']/apc_pairs_pm['cur_next_time']
 apc_pairs_pm['speed_loc_dis'] = 3600* apc_pairs_pm['cur_next_loc_dis']/apc_pairs_pm['cur_next_time']
-apc_pairs_pm.to_csv('S:/CMP/Transit/Speed/APC_2019_Stop_Pairs_PM_update_manual.csv', index=False)
+apc_pairs_pm.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_PM_update_manual.csv'), index=False)
 
 apc_pairs_pm_clean = apc_pairs_pm[apc_pairs_pm['cur_stop_dwell_time']<180]
 
@@ -584,7 +594,7 @@ apc_cmp_speeds = apc_cmp_speeds_am.append(apc_cmp_speeds_pm, ignore_index=True)
 
 apc_cmp_speeds['len_ratio'] = np.where(apc_cmp_speeds['len_ratio']>100, 100, apc_cmp_speeds['len_ratio'])
 
-apc_cmp_speeds.to_csv(directory + 'SF_CMP_Transit_Speeds_update.csv', index=False)
+apc_cmp_speeds.to_csv(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Speeds_update.csv'), index=False)
 
 cmp_segs_apc_am = cmp_segs_org.merge(apc_cmp_speeds_am, on='cmp_segid', how='left')
 cmp_segs_apc_am['period'] = 'AM'
@@ -592,10 +602,10 @@ cmp_segs_apc_pm = cmp_segs_org.merge(apc_cmp_speeds_pm, on='cmp_segid', how='lef
 cmp_segs_apc_pm['period'] = 'PM'
 cmp_segs_apc = cmp_segs_apc_am.append(cmp_segs_apc_pm, ignore_index=True)
 cmp_segs_apc.crs = wgs84
-cmp_segs_apc.to_file('S:/CMP/Transit/Speed/SF_CMP_Transit_Speeds_Aug31.shp')
+cmp_segs_apc.to_file(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Speeds_Aug31.shp'))
 
 apc_cmp_speeds_over50 = apc_cmp_speeds[apc_cmp_speeds['len_ratio']>=50]
 print('Number of final segment-periods ', len(apc_cmp_speeds_over50))
 
 out_cols = ['cmp_segid', 'period', 'avg_loc_speed', 'std_loc_speed', 'cov_loc_speed', 'avg_rev_speed', 'std_rev_speed', 'cov_rev_speed', 'len_ratio']
-apc_cmp_speeds_over50[out_cols].to_csv(directory + 'SF_CMP_Transit_Speeds_Over50%_update.csv', index=False)
+apc_cmp_speeds_over50[out_cols].to_csv(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Speeds_Over50%_update.csv'), index=False)
