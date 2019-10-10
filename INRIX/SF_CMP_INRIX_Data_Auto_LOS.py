@@ -1,5 +1,6 @@
 # Import necessary packages
 import pandas as pd
+import geopandas as gp
 import dask.dataframe as dd
 import dask.distributed
 import os
