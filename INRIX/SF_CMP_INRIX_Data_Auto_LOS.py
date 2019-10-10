@@ -17,7 +17,6 @@ SPEED_DIR = r'S:\CMP\Auto LOS'
 
 
 # Input CMP segment shapefile
-cmp_name = 'S:/CMP/Network Conflation/cmp_roadway_segments.shp'
 cmp_segs=gp.read_file(os.path.join(NETCONF_DIR, 'cmp_roadway_segments.shp'))
 
 # Get CMP and INRIX correspondence table
