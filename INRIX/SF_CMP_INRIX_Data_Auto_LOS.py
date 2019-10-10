@@ -11,8 +11,8 @@ NETCONF_DIR = r'S:\CMP\Network Conflation'
 SPEED_DIR = r'S:\CMP\Auto LOS'
 
 # SFCTA Paths
-#NETCONF_DIR = r'S:\CMP\Network Conflation'
-#SPEED_DIR = r'S:\CMP\Auto LOS'
+#NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2019\Network_Conflation'
+#SPEED_DIR = r'Q:\CMP\LOS Monitoring 2019'
 
 
 # Input CMP segment shapefile
