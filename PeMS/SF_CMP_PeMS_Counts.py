@@ -30,8 +30,8 @@ PeMS_DIR = r'S:\CMP\PeMS'
 #SFCTA Paths
 #PeMS_DIR = r'Q:\CMP\LOS Monitoring 2019\PeMS'
 
-pems = pd.read_csv(os.path.join(PeMS_DIR, 'SF_PeMS_Stations.csv')
-census = pd.read_csv(os.path.join(PeMS_DIR, 'SF_Census_Stations.csv')
+pems = pd.read_csv(os.path.join(PeMS_DIR, 'SF_PeMS_Stations.csv'))
+census = pd.read_csv(os.path.join(PeMS_DIR, 'SF_Census_Stations.csv'))
 
 # Only April and May count data are downloaded. Additional count data can be downloaded and processed if necessary.
 months = [4, 5]
