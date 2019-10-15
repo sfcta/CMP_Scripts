@@ -16,6 +16,7 @@ python SF_CMP_PeMS_Counts.py.
 
 import pandas as pd
 import numpy as np
+import os
 import dask.dataframe as dd
 from dask.diagnostics import ProgressBar
 import dask.distributed
@@ -23,9 +24,14 @@ client = dask.distributed.Client()
 import warnings
 warnings.filterwarnings("ignore")
 
-pems = pd.read_csv('S:/CMP/PeMS/SF_PeMS_Stations.csv')
+#UK Paths
+PeMS_DIR = r'S:\CMP\PeMS'
 
-census = pd.read_csv('S:/CMP/PeMS/SF_Census_Stations.csv')
+#SFCTA Paths
+#PeMS_DIR = r'Q:\CMP\LOS Monitoring 2019\PeMS'
+
+pems = pd.read_csv(os.path.join(PeMS_DIR, 'SF_PeMS_Stations.csv'))
+census = pd.read_csv(os.path.join(PeMS_DIR, 'SF_Census_Stations.csv'))
 
 # Only April and May count data are downloaded. Additional count data can be downloaded and processed if necessary.
 months = [4, 5]
@@ -45,11 +51,11 @@ for month in months:
     if month ==4:
         for day in range(1, 31):
             if day<10:
-                filename = 'S:/CMP/PeMS/d04_text_station_5min_2019_04_0' + str(day) + '.txt'
+                filename = 'd04_text_station_5min_2019_04_0' + str(day) + '.txt'
             else:
-                filename = 'S:/CMP/PeMS/d04_text_station_5min_2019_04_' + str(day) + '.txt'
-            df = dd.read_csv(filename, names = colnames, assume_missing=True)
-			
+                filename = 'd04_text_station_5min_2019_04_' + str(day) + '.txt'
+	    df = dd.read_csv(os.path.join(PeMS_DIR, filename), names = colnames, assume_missing=True)
+	
 	    # Query out counts for selected stations
             df_sf_day = df[df['Station'].isin(sf_stations)].compute()
             sf_counts = sf_counts.append(df_sf_day, ignore_index=True)
@@ -57,13 +63,13 @@ for month in months:
     if month ==5:
         for day in range(1, 32):
             if day<10:
-                filename = 'S:/CMP/PeMS/d04_text_station_5min_2019_05_0' + str(day) + '.txt'
+                filename = 'd04_text_station_5min_2019_05_0' + str(day) + '.txt'
             else:
-                filename = 'S:/CMP/PeMS/d04_text_station_5min_2019_05_' + str(day) + '.txt'
-            df = dd.read_csv(filename, names = colnames, assume_missing=True)
+                filename = 'd04_text_station_5min_2019_05_' + str(day) + '.txt'
+	    df = dd.read_csv(os.path.join(PeMS_DIR, filename), names = colnames, assume_missing=True)
+
             df_sf_day = df[df['Station'].isin(sf_stations)].compute()
             sf_counts = sf_counts.append(df_sf_day, ignore_index=True)
-
 
 # Convert the timestamp into date_time attribute
 sf_counts['Date_Time'] = pd.to_datetime(sf_counts['Timestamp'])
@@ -108,4 +114,4 @@ counts_daytype_complete['Minute'] = np.where(counts_daytype_complete['Epoch']%2 
 counts_daytype_complete['Period'] = counts_daytype_complete['Hour'].astype(str) + ':' + counts_daytype_complete['Minute']
 
 # Save the output table
-counts_daytype_complete[['Station', 'DayType', 'Period', 'Avg_Counts']].to_csv('S:/CMP/PeMS/SF_PeMS_Stations_Average_Counts.csv', index=False)
+counts_daytype_complete[['Station', 'DayType', 'Period', 'Avg_Counts']].to_csv(os.path.join(PeMS, 'SF_PeMS_Stations_Average_Counts.csv'), index=False)
