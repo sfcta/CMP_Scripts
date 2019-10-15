@@ -7,16 +7,24 @@ INPUTS: Transit APC data
 OUTPUTS: The average boardings, alightings, and loads by stops and day types at the 30-min resolution.
 
 USAGE:
-To use the script, replace dir1 with the directory where the APC data of interest is located and replace the APC file name. 
+To use the script, replace VOL_DIR with the directory where the APC data of interest is located and replace the APC file name. 
 Run the script with the command: python SF_CMP_Transit_APC_Volume.py.
 '''
 
 import pandas as pd
 import numpy as np
+import os
 
 # Read in the file
-dir1 = 'S:/CMP/Transit/Volume/'
-vol = pd.read_csv(dir1 + 'APC_2019_SPRING_SO_STOPS02.txt', sep='\t')
+#UK Paths
+VOL_DIR = 'S:/CMP/Transit/Volume/'
+vol = pd.read_csv(VOL_DIR + 'APC_2019_SPRING_SO_STOPS02.txt', sep='\t')
+vol_agg_output = VOL_DIR + 'CMP_APC_Average_Volume.csv'  # Output file name and directory
+
+#SFCTA Paths
+#VOL_DIR = r'Q:\CMP\LOS Monitoring 2019\Transit\Volume'
+#vol = pd.read_csv(os.path.join(VOL_DIR, 'APC_2019_SPRING_SO_STOPS02.txt'), sep='\t')
+#vol_agg_output = os.path.join(VOL_DIR, 'CMP_APC_Average_Volume.csv')
 
 # Assign 30-minute period
 vol['Close_Hour'] = vol['CLOSE_DATE_TIME'].str[10:12].astype(int)
@@ -66,4 +74,4 @@ stop_vol_complete['Minute'] = np.where(stop_vol_complete['Epoch']%2 ==0, '00', '
 stop_vol_complete['Period'] = stop_vol_complete['Hour'].astype(str) + ':' + stop_vol_complete['Minute']
 
 # Save the output file
-stop_vol_complete[['STOPID', 'DayType', 'Period', 'Avg_Boardings', 'Avg_Alightings', 'Avg_Loads']].to_csv(dir1 + 'CMP_APC_Average_Volume.csv', index=False)
+stop_vol_complete[['STOPID', 'DayType', 'Period', 'Avg_Boardings', 'Avg_Alightings', 'Avg_Loads']].to_csv(vol_agg_output, index=False)
