@@ -442,10 +442,10 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, timep):
                                                                         'cur_next_time': 'sum').reset_index()
     apc_trip_speeds.columns = ['cmp_segid', 'trip_id', 'trip_date', 
                               'trip_stop_distance', 'trip_rev_distance', 'trip_traveltime']
-    apc_trip_speeds['trip_loc_speed'] = 3600* apc_cmp_speeds['trip_stop_distance']/apc_cmp_speeds['trip_traveltime']
-    apc_trip_speeds['trip_rev_speed'] = 3600* apc_cmp_speeds['trip_rev_distance']/apc_cmp_speeds['trip_traveltime']
+    apc_trip_speeds['trip_loc_speed'] = 3600* apc_trip_speeds['trip_stop_distance']/apc_trip_speeds['trip_traveltime']
+    apc_trip_speeds['trip_rev_speed'] = 3600* apc_trip_speeds['trip_rev_distance']/apc_trip_speeds['trip_traveltime']
     
-    apc_cmp_speeds = apc_pairs_clean.groupby(['cmp_segid']).agg({'trip_stop_distance': 'sum',
+    apc_cmp_speeds = apc_trip_speeds.groupby(['cmp_segid']).agg({'trip_stop_distance': 'sum',
                                                                        'trip_rev_distance': 'sum',
                                                                         'trip_traveltime': 'sum',
                                                                        'trip_loc_speed': 'std',
