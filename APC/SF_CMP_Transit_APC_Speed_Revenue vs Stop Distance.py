@@ -44,6 +44,12 @@ cmp_segs_prj['cmp_name'] = cmp_segs_prj['cmp_name'].str.lower()
 cmp_segs_prj['Length'] = cmp_segs_prj.geometry.length 
 cmp_segs_prj['Length'] = cmp_segs_prj['Length'] * 3.2808  #meters to feet
 
+# INRIX network
+inrix_net=gp.read_file(os.path.join(NETCONF_DIR, 'inrix_xd_sf.shp'))
+inrix_net['RoadName'] = inrix_net['RoadName'].str.lower()
+
+cmp_inrix_corr = pd.read_csv(os.path.join(NETCONF_DIR, 'CMP_Segment_INRIX_Links_Correspondence.csv'))
+
 # Create a buffer zone for each cmp segment
 ft=160   # According to the memo from last CMP cycle
 mt=round(ft/3.2808,4)
