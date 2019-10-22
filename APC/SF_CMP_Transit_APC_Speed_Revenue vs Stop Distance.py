@@ -44,12 +44,6 @@ cmp_segs_prj['cmp_name'] = cmp_segs_prj['cmp_name'].str.lower()
 cmp_segs_prj['Length'] = cmp_segs_prj.geometry.length 
 cmp_segs_prj['Length'] = cmp_segs_prj['Length'] * 3.2808  #meters to feet
 
-# INRIX network
-inrix_net=gp.read_file(os.path.join(NETCONF_DIR, 'inrix_xd_sf.shp'))
-inrix_net['RoadName'] = inrix_net['RoadName'].str.lower()
-
-cmp_inrix_corr = pd.read_csv(os.path.join(NETCONF_DIR, 'CMP_Segment_INRIX_Links_Correspondence.csv'))
-
 # Create a buffer zone for each cmp segment
 ft=160   # According to the memo from last CMP cycle
 mt=round(ft/3.2808,4)
@@ -160,12 +154,14 @@ angle_thrd = 10
 def match_stop_pairs_to_cmp(apc_cmp_df, stops_near_cmp_list, cmp_segs_near, cmp_segs_prj, angle_thrd):
     apc_pairs_df = pd.DataFrame()
     pair_cnt = 0
-    for cur_stop_idx in range(len(apc_cmp_df)-1):
+    for cur_stop_idx in range(len(apc_cmp_df)-1):  #Enumerate the records in apc_cmp_df
+        # Check if the stop_id is in the previously matched list
         if apc_cmp_df.loc[cur_stop_idx, 'stop_id'] in stops_near_cmp_list:
             next_stop_match = 0
             if apc_cmp_df.loc[cur_stop_idx + 1, 'stop_id'] in stops_near_cmp_list:
                 next_stop_idx = cur_stop_idx + 1 
                 next_stop_match = 1
+            # This is to ensure the stop_id associated with cur_stop_idx + 2 is also checked when the stop_id associated with cur_stop_idx + 1 is not found in the matched list
             elif apc_cmp_df.loc[cur_stop_idx + 2, 'stop_id'] in stops_near_cmp_list:
                 next_stop_idx = cur_stop_idx +2
                 next_stop_match = 2
@@ -201,6 +197,7 @@ def match_stop_pairs_to_cmp(apc_cmp_df, stops_near_cmp_list, cmp_segs_near, cmp_
 
                     # Find the common CMP segments in two sets
                     common_segs = list(set(cur_stop_near_segs) & set(next_stop_near_segs))
+                    
                     if len(common_segs)>0:
                         cur_stop_geo = apc_cmp_df.loc[cur_stop_idx]['geometry']   # location geometry of current stop
                         next_stop_geo = apc_cmp_df.loc[next_stop_idx]['geometry']  # location geometry of succeeding stop
@@ -320,7 +317,9 @@ matched_cmp_segs = stop_cmp_match['cmp_segid'].unique().tolist()
 
 # # Transit Speeds on CMP Segment 
 
-# ### Manually Matched Pairs 
+# ### Manually Matched Pairs
+
+# Read in the list of stop pairs manually identified that are patially overlap with cmp segments
 overlap_pairs = pd.read_csv(os.path.join(MAIN_DIR, 'Postprocessing_overlapping_transit_segments.csv'))
 
 def match_intermediate_apc_stops(apc_pairs, apc_cmp, timep):
@@ -331,6 +330,7 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, timep):
     
     covered_stop_pairs = pd.DataFrame()
     cnt = 0
+    # Get unique stop pairs for dealing with stop-skipping issue
     apc_pairs_unique = apc_pairs.drop_duplicates(subset=['cmp_segid', 'cur_stop_id', 'next_stop_id']).reset_index()
     for cmp_segid in matched_cmp_segs:
         cmp_stops = stop_cmp_match[stop_cmp_match['cmp_segid']==cmp_segid].sort_values(by=['stop_loc']).reset_index()
@@ -349,6 +349,7 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, timep):
                     print('Duplicate next stop id %s on CMP seg %s' % (next_stopid, cmp_segid)) 
                 next_stop_seq_idx = next_stop_idx_list[0]
                 
+                # Break stop pairs at skipped stops, if any
                 for mid_stop_seq_idx in range(cur_stop_seq_idx, next_stop_seq_idx):
                     covered_stop_pairs.loc[cnt, 'cmp_segid'] = cmp_segid
                     covered_stop_pairs.loc[cnt, 'cur_stop_id'] = cmp_stops.loc[mid_stop_seq_idx, 'stop_id']
@@ -357,6 +358,7 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, timep):
                     covered_stop_pairs.loc[cnt, 'next_stop_loc'] = cmp_stops.loc[mid_stop_seq_idx + 1, 'stop_loc']
                     cnt = cnt + 1
 
+    # Get a unique list of stop pairs accounted for the stop-skipping issue
     covered_stop_pairs_unique = covered_stop_pairs.drop_duplicates()
     covered_stop_pairs_unique['dist'] = abs(covered_stop_pairs_unique['next_stop_loc'] - covered_stop_pairs_unique['cur_stop_loc'])
 
@@ -435,14 +437,22 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, timep):
     apc_pairs.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_%s_update_manual.csv' %timep), index=False)
     
     apc_pairs_clean = apc_pairs[apc_pairs['cur_stop_dwell_time']<180]
-    apc_cmp_speeds = apc_pairs_clean.groupby(['cmp_segid']).agg({'cur_next_loc_dis': 'sum',
+    apc_trip_speeds = apc_pairs_clean.groupby(['cmp_segid', 'trip_id', 'trip_date']).agg({'cur_next_loc_dis': 'sum',
                                                                        'cur_next_rev_dis': 'sum',
-                                                                        'cur_next_time': 'sum',
-                                                                       'speed_loc_dis': 'std',
-                                                                       'speed_rev_dis': 'std',
+                                                                        'cur_next_time': 'sum').reset_index()
+    apc_trip_speeds.columns = ['cmp_segid', 'trip_id', 'trip_date', 
+                              'trip_stop_distance', 'trip_rev_distance', 'trip_traveltime']
+    apc_trip_speeds['trip_loc_speed'] = 3600* apc_cmp_speeds['trip_stop_distance']/apc_cmp_speeds['trip_traveltime']
+    apc_trip_speeds['trip_rev_speed'] = 3600* apc_cmp_speeds['trip_rev_distance']/apc_cmp_speeds['trip_traveltime']
+    
+    apc_cmp_speeds = apc_pairs_clean.groupby(['cmp_segid']).agg({'trip_stop_distance': 'sum',
+                                                                       'trip_rev_distance': 'sum',
+                                                                        'trip_traveltime': 'sum',
+                                                                       'trip_loc_speed': 'std',
+                                                                       'trip_rev_speed': 'std',
                                                                         'trip_id': 'count'}).reset_index()
     apc_cmp_speeds.columns = ['cmp_segid', 'total_stop_distance', 'total_rev_distance',
-                                 'total_traveltime', 'std_loc_speed','std_rev_speed', 'sample_size']
+                                 'total_traveltime', 'std_loc_speed', 'std_rev_speed', 'sample_size']
     apc_cmp_speeds['avg_loc_speed'] = 3600* apc_cmp_speeds['total_stop_distance']/apc_cmp_speeds['total_traveltime']
     apc_cmp_speeds['avg_rev_speed'] = 3600* apc_cmp_speeds['total_rev_distance']/apc_cmp_speeds['total_traveltime']
     apc_cmp_speeds['cov_loc_speed'] = 100* apc_cmp_speeds['std_loc_speed']/apc_cmp_speeds['avg_loc_speed']
@@ -463,7 +473,7 @@ apc_cmp_speeds = apc_cmp_speeds_am.append(apc_cmp_speeds_pm, ignore_index=True)
 
 apc_cmp_speeds['len_ratio'] = np.where(apc_cmp_speeds['len_ratio']>100, 100, apc_cmp_speeds['len_ratio'])
 
-apc_cmp_speeds.to_csv(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Speeds_update.csv'), index=False)
+apc_cmp_speeds.to_csv(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Trip_Speeds.csv'), index=False)
 
 cmp_segs_apc_am = cmp_segs_org.merge(apc_cmp_speeds_am, on='cmp_segid', how='left')
 cmp_segs_apc_am['period'] = 'AM'
@@ -471,10 +481,10 @@ cmp_segs_apc_pm = cmp_segs_org.merge(apc_cmp_speeds_pm, on='cmp_segid', how='lef
 cmp_segs_apc_pm['period'] = 'PM'
 cmp_segs_apc = cmp_segs_apc_am.append(cmp_segs_apc_pm, ignore_index=True)
 cmp_segs_apc.crs = wgs84
-cmp_segs_apc.to_file(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Speeds_Aug31.shp'))
+cmp_segs_apc.to_file(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Trips_Speeds.shp'))
 
 apc_cmp_speeds_over50 = apc_cmp_speeds[apc_cmp_speeds['len_ratio']>=50]
 print('Number of final segment-periods ', len(apc_cmp_speeds_over50))
 
-out_cols = ['cmp_segid', 'period', 'avg_loc_speed', 'std_loc_speed', 'cov_loc_speed', 'avg_rev_speed', 'std_rev_speed', 'cov_rev_speed', 'len_ratio']
-apc_cmp_speeds_over50[out_cols].to_csv(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Speeds_Over50%_update.csv'), index=False)
+out_cols = ['cmp_segid', 'period', 'avg_loc_speed', 'std_loc_speed', 'cov_loc_speed', 'avg_rev_speed', 'std_rev_speed', 'sample_size', 'cov_rev_speed', 'len_ratio']
+apc_cmp_speeds_over50[out_cols].to_csv(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Trip_Speeds_Over50%.csv'), index=False)
