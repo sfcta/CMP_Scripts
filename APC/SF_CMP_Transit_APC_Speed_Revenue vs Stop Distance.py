@@ -117,6 +117,20 @@ stops_near_cmp_list = stops_near_cmp['stop_id'].unique().tolist()
 
 cmp_segs_near = cmp_segs_intersect[cmp_segs_intersect['name_match']==1]
 
+# Remove mismatched stops determined by manual QAQC review
+remove_cmp_stop = [(175, 5546), (175, 5547), (175, 7299), (175, 5544),
+                  (66, 7744),
+                  (214, 7235),
+                  (107, 4735),
+                  (115, 4275),
+                  (143, 4824),
+                  (172, 5603)]
+for remove_idx in range(len(remove_cmp_stop)):
+    rmv_cmp_id = remove_cmp_stop[remove_idx][0]
+    rmv_stop_id = remove_cmp_stop[remove_idx][1]
+    remove_df_idx = cmp_segs_near.index[(cmp_segs_near['cmp_segid']==rmv_cmp_id) & (cmp_segs_near['stop_id']==rmv_stop_id)].tolist()[0]
+    cmp_segs_near = cmp_segs_near.drop([remove_df_idx], axis=0)
+
 
 # Preprocess APC data
 apc_fields = ['EXT_TRIP_ID', 'DIRECTION', 'ACTUAL_DATE', 'VEHICLE_ID', 'CALC_SPEED', 
@@ -437,6 +451,11 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, timep):
     covered_cmp_len_ratio = pd.merge(covered_cmp_len, cmp_segs_prj, on='cmp_segid')
     covered_cmp_len_ratio['len_ratio'] = round(100 * covered_cmp_len_ratio['pair_len']/covered_cmp_len_ratio['Length'], 2)
     
+    # Update cur_next_loc_dis between stop pairs if revenue distance is greater than the stop pair distance, which could occur
+    # if one of or both matched stops are outside the cmp segment
+    apc_pairs['cur_next_loc_dis'] = np.where(apc_pairs['cur_next_loc_dis'] >= apc_pairs['cur_next_rev_dis'], 
+                                            apc_pairs['cur_next_loc_dis'],
+                                            apc_pairs['cur_next_rev_dis'])
     apc_pairs['speed_rev_dis'] = 3600* apc_pairs['cur_next_rev_dis']/apc_pairs['cur_next_time']
     apc_pairs['speed_loc_dis'] = 3600* apc_pairs['cur_next_loc_dis']/apc_pairs['cur_next_time']
     
@@ -450,6 +469,7 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, timep):
                               'trip_stop_distance', 'trip_rev_distance', 'trip_traveltime']
     apc_trip_speeds['trip_loc_speed'] = 3600* apc_trip_speeds['trip_stop_distance']/apc_trip_speeds['trip_traveltime']
     apc_trip_speeds['trip_rev_speed'] = 3600* apc_trip_speeds['trip_rev_distance']/apc_trip_speeds['trip_traveltime']
+    apc_trip_speeds.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Trips_%s_update_manual_Oct22.csv' %timep), index=False)
     
     apc_cmp_speeds = apc_trip_speeds.groupby(['cmp_segid']).agg({'trip_stop_distance': 'sum',
                                                                        'trip_rev_distance': 'sum',
