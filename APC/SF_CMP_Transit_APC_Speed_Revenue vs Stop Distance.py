@@ -478,3 +478,63 @@ print('Number of final segment-periods ', len(apc_cmp_speeds_over50))
 
 out_cols = ['cmp_segid', 'period', 'avg_loc_speed', 'std_loc_speed', 'cov_loc_speed', 'avg_rev_speed', 'std_rev_speed', 'cov_rev_speed', 'len_ratio']
 apc_cmp_speeds_over50[out_cols].to_csv(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Speeds_Over50%_update.csv'), index=False)
+
+# Generate sample size distribution graph
+# Create sample size groups
+apc_cmp_speeds_over50['group_id'] = np.where(apc_cmp_speeds_over50['sample_size']<50, 0,
+                                          np.where(apc_cmp_speeds_over50['sample_size']<100, 1,
+                                                   np.where(apc_cmp_speeds_over50['sample_size']<250, 2,
+                                                            np.where(apc_cmp_speeds_over50['sample_size']<500, 3,
+                                                                     np.where(apc_cmp_speeds_over50['sample_size']<1000, 4,
+                                                                              np.where(apc_cmp_speeds_over50['sample_size']<2000, 5,
+                                                                                       6
+                                         ))))))
+apc_cmp_speeds_over50['group_range'] = np.where(apc_cmp_speeds_over50['sample_size']<50, '0-50',
+                                          np.where(apc_cmp_speeds_over50['sample_size']<100, '50-100',
+                                                   np.where(apc_cmp_speeds_over50['sample_size']<250, '100-250',
+                                                            np.where(apc_cmp_speeds_over50['sample_size']<500, '250-500',
+                                                                     np.where(apc_cmp_speeds_over50['sample_size']<1000, '500-1000',
+                                                                              np.where(apc_cmp_speeds_over50['sample_size']<2000, '1000-2000',
+                                                                                       '>2000'
+                                         ))))))
+apc_cmp_count = apc_cmp_speeds_over50.groupby(['group_id', 'group_range', 'period']).cmp_segid.count().reset_index()
+apc_cmp_count.columns = ['group_id', 'group_range', 'period', 'count']
+
+# Generate graph
+import matplotlib.pyplot as plt
+n_groups = 7
+fig, ax = plt.subplots(figsize=(10,5))
+bar_width = 0.35
+opacity = 0.8
+
+#Create bars
+am_bvalue = apc_cmp_count[apc_cmp_count['period']=='AM']['count'].tolist()
+pm_bvalue = apc_cmp_count[apc_cmp_count['period']=='PM']['count'].tolist()
+
+# Get x position of bars
+am_bx = apc_cmp_count[apc_cmp_count['period']=='AM']['group_id'].tolist()
+pm_bx = [pm_x + bar_width for pm_x in apc_cmp_count[apc_cmp_count['period']=='PM']['group_id'].tolist()]
+
+am = plt.bar(am_bx, am_bvalue, bar_width, alpha=opacity, color='blue', label='AM')
+pm = plt.bar(pm_bx, pm_bvalue, bar_width, alpha=opacity, color='orange', label='PM')
+
+plt.xticks([grp + bar_width-0.18 for grp in range(n_groups)], ['0-50', '50-100', '100-250', '250-500', '500-1000', '1000-2000', '>2000'])
+ax.tick_params(axis='both', which='major', labelsize=12)
+
+plt.xlabel('Number of APC Records', fontsize = 14)
+plt.ylabel('Number of CMP Segments', fontsize = 14)
+plt.legend(fontsize=12)
+
+# Create bar value labels
+label = am_bvalue + pm_bvalue
+bx = am_bx + pm_bx
+# Text on the top of each bar
+for i in range(len(bx)):
+    plt.text(x = bx[i] - 0.1 , y = label[i] + 1, s = label[i], size = 10)
+
+ax.spines['right'].set_visible(False)
+ax.spines['top'].set_visible(False)
+
+plt.tight_layout()
+plt.savefig(os.path.join(MAIN_DIR, 'Sample_Size_Distribution.png'), bbox_inches = 'tight')
+plt.show()
