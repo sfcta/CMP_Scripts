@@ -1,4 +1,4 @@
-# Import necessary packages
+# Import needed packages
 import pandas as pd
 pd.options.display.max_columns = None
 import numpy as np
@@ -20,14 +20,14 @@ wgs84 = {'proj': 'longlat', 'ellps': 'WGS84', 'datum': 'WGS84', 'no_defs': True}
 cal3 = {'proj': 'lcc +lat_1=37.06666666666667 +lat_2=38.43333333333333 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000.0000000002', 'ellps': 'GRS80', 'datum': 'NAD83', 'no_defs': True}
 
 # UK Paths
-# MAIN_DIR = 'S:/CMP/Transit/Speed'
-# NETCONF_DIR = 'S:/CMP/Network Conflation'
-# APC_FILE = 'S:/CMP/Transit/Speed/APC_2019_SPRING/APC_2019_SPRING.txt'
+MAIN_DIR = 'S:/CMP/Transit/Speed'
+NETCONF_DIR = 'S:/CMP/Network Conflation'
+APC_FILE = 'S:/CMP/Transit/Speed/APC_2019_SPRING/APC_2019_SPRING.txt'
 
 # SFCTA Paths
-MAIN_DIR = r'Q:\CMP\LOS Monitoring 2019\Transit\Speed'
-NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2019\Network_Conflation'
-APC_FILE = r'Q:\Data\Observed\Transit\Muni\APC\CMP_2019\APC_2019_SPRING.txt'
+#MAIN_DIR = r'Q:\CMP\LOS Monitoring 2019\Transit\Speed'
+#NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2019\Network_Conflation'
+#APC_FILE = r'Q:\Data\Observed\Transit\Muni\APC\CMP_2019\APC_2019_SPRING.txt'
 
 
 # Convert original coordinate system to state plane
@@ -117,7 +117,8 @@ stops_near_cmp_list = stops_near_cmp['stop_id'].unique().tolist()
 
 cmp_segs_near = cmp_segs_intersect[cmp_segs_intersect['name_match']==1]
 
-# Remove mismatched stops determined by manual QAQC review
+
+# Remove mismatched stops based on manual review
 remove_cmp_stop = [(175, 5546), (175, 5547), (175, 7299), (175, 5544),
                   (66, 7744),
                   (214, 7235),
@@ -125,6 +126,7 @@ remove_cmp_stop = [(175, 5546), (175, 5547), (175, 7299), (175, 5544),
                   (115, 4275),
                   (143, 4824),
                   (172, 5603)]
+
 for remove_idx in range(len(remove_cmp_stop)):
     rmv_cmp_id = remove_cmp_stop[remove_idx][0]
     rmv_stop_id = remove_cmp_stop[remove_idx][1]
@@ -136,7 +138,6 @@ for remove_idx in range(len(remove_cmp_stop)):
 apc_fields = ['EXT_TRIP_ID', 'DIRECTION', 'ACTUAL_DATE', 'VEHICLE_ID', 'CALC_SPEED', 
             'REV_DISTANCE', 'OPEN_DATE_TIME', 'DWELL_TIME', 'CLOSE_DATE_TIME', 'STOPID']
 apc_cmp = pd.read_csv(APC_FILE, sep='\t', usecols=apc_fields)
-
 
 apc_cmp['Date']=pd.to_datetime(apc_cmp['ACTUAL_DATE'])
 apc_cmp['DOW']=apc_cmp.Date.dt.dayofweek #Tue-1, Wed-2, Thu-3
@@ -167,6 +168,7 @@ apc_cmp['Open_Hour'] = apc_cmp.Open_Time.dt.hour
 apc_cmp['Close_Hour'] = apc_cmp.Close_Time.dt.hour
 apc_cmp['Open_Time_float'] = apc_cmp['Open_Hour'] + apc_cmp['Open_Minute']/60 + apc_cmp['Open_Second']/3600
 apc_cmp['Close_Time_float'] = apc_cmp['Close_Hour'] + apc_cmp['Close_Minute']/60 + apc_cmp['Close_Second']/3600
+
 
 
 # # Match AM&PM transit stops to CMP segments
@@ -293,7 +295,8 @@ apc_cmp_am = apc_cmp_am.sort_values(by=['EXT_TRIP_ID', 'ACTUAL_DATE', 'VEHICLE_I
 
 print('------------Start processing AM trips------------')
 apc_pairs_am = match_stop_pairs_to_cmp(apc_cmp_am, stops_near_cmp_list, cmp_segs_near, cmp_segs_prj, angle_thrd)
-apc_pairs_am.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_AM_update.csv'), index=False)
+#apc_pairs_am.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_AM_Oct22.csv'), index=False)
+
 
 # ## PM 
 apc_cmp_pm = apc_cmp[(apc_cmp['Open_Time_float']<=18.5) & (apc_cmp['Close_Time_float']>=16.5)]
@@ -303,7 +306,7 @@ apc_cmp_pm = apc_cmp_pm.sort_values(by=['EXT_TRIP_ID', 'ACTUAL_DATE', 'VEHICLE_I
 
 print('------------Start processing PM trips------------')
 apc_pairs_pm = match_stop_pairs_to_cmp(apc_cmp_pm, stops_near_cmp_list, cmp_segs_near, cmp_segs_prj, angle_thrd)
-apc_pairs_pm.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_PM_update.csv'), index=False)
+#apc_pairs_pm.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_PM_Oct22.csv'), index=False)
 
 
 # ## Stop and Segment Matching 
@@ -335,6 +338,7 @@ stop_cmp_match['cmp_segid'] = stop_cmp_match['cmp_segid'].astype(int)
 matched_cmp_segs = stop_cmp_match['cmp_segid'].unique().tolist()
 
 
+
 # # Transit Speeds on CMP Segment 
 
 # ### Manually Matched Pairs
@@ -342,45 +346,45 @@ matched_cmp_segs = stop_cmp_match['cmp_segid'].unique().tolist()
 # Read in the list of stop pairs manually identified that are patially overlap with cmp segments
 overlap_pairs = pd.read_csv(os.path.join(MAIN_DIR, 'Postprocessing_overlapping_transit_segments.csv'))
 
-def match_intermediate_apc_stops(apc_pairs, apc_cmp, timep):
+def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj, timep):
     # ### Auto Matched Pairs 
     apc_pairs['cmp_segid'] = apc_pairs['cmp_segid'].astype(int)
     apc_pairs['cur_stop_id'] = apc_pairs['cur_stop_id'].astype(int)
     apc_pairs['next_stop_id'] = apc_pairs['next_stop_id'].astype(int)
     
-    covered_stop_pairs = pd.DataFrame()
-    cnt = 0
-    # Get unique stop pairs for dealing with stop-skipping issue
-    apc_pairs_unique = apc_pairs.drop_duplicates(subset=['cmp_segid', 'cur_stop_id', 'next_stop_id']).reset_index()
-    for cmp_segid in matched_cmp_segs:
-        cmp_stops = stop_cmp_match[stop_cmp_match['cmp_segid']==cmp_segid].sort_values(by=['stop_loc']).reset_index()
-        cmp_stop_pairs = apc_pairs_unique.index[apc_pairs_unique['cmp_segid']==cmp_segid].tolist()
-        if len(cmp_stop_pairs)>0:
-            for pair_idx in cmp_stop_pairs:
-                cur_stopid = apc_pairs_unique.loc[pair_idx, 'cur_stop_id']
-                cur_stop_idx_list = cmp_stops.index[cmp_stops['stop_id'] == cur_stopid].tolist()
-                if len(cur_stop_idx_list)>1:
-                    print('Duplicate cur stop id %s on CMP seg %s' % (cur_stopid, cmp_segid))
-                cur_stop_seq_idx = cur_stop_idx_list[0]
+#     covered_stop_pairs = pd.DataFrame()
+#     cnt = 0
+#     # Get unique stop pairs for dealing with stop-skipping issue
+#     apc_pairs_unique = apc_pairs.drop_duplicates(subset=['cmp_segid', 'cur_stop_id', 'next_stop_id']).reset_index()
+#     for cmp_segid in matched_cmp_segs:
+#         cmp_stops = stop_cmp_match[stop_cmp_match['cmp_segid']==cmp_segid].sort_values(by=['stop_loc']).reset_index()
+#         cmp_stop_pairs = apc_pairs_unique.index[apc_pairs_unique['cmp_segid']==cmp_segid].tolist()
+#         if len(cmp_stop_pairs)>0:
+#             for pair_idx in cmp_stop_pairs:
+#                 cur_stopid = apc_pairs_unique.loc[pair_idx, 'cur_stop_id']
+#                 cur_stop_idx_list = cmp_stops.index[cmp_stops['stop_id'] == cur_stopid].tolist()
+#                 if len(cur_stop_idx_list)>1:
+#                     print('Duplicate cur stop id %s on CMP seg %s' % (cur_stopid, cmp_segid))
+#                 cur_stop_seq_idx = cur_stop_idx_list[0]
                 
-                next_stopid = apc_pairs_unique.loc[pair_idx, 'next_stop_id']
-                next_stop_idx_list = cmp_stops.index[cmp_stops['stop_id'] == next_stopid].tolist()
-                if len(next_stop_idx_list)>1:
-                    print('Duplicate next stop id %s on CMP seg %s' % (next_stopid, cmp_segid)) 
-                next_stop_seq_idx = next_stop_idx_list[0]
+#                 next_stopid = apc_pairs_unique.loc[pair_idx, 'next_stop_id']
+#                 next_stop_idx_list = cmp_stops.index[cmp_stops['stop_id'] == next_stopid].tolist()
+#                 if len(next_stop_idx_list)>1:
+#                     print('Duplicate next stop id %s on CMP seg %s' % (next_stopid, cmp_segid)) 
+#                 next_stop_seq_idx = next_stop_idx_list[0]
                 
-                # Break stop pairs at skipped stops, if any
-                for mid_stop_seq_idx in range(cur_stop_seq_idx, next_stop_seq_idx):
-                    covered_stop_pairs.loc[cnt, 'cmp_segid'] = cmp_segid
-                    covered_stop_pairs.loc[cnt, 'cur_stop_id'] = cmp_stops.loc[mid_stop_seq_idx, 'stop_id']
-                    covered_stop_pairs.loc[cnt, 'cur_stop_loc'] = cmp_stops.loc[mid_stop_seq_idx, 'stop_loc']
-                    covered_stop_pairs.loc[cnt, 'next_stop_id'] = cmp_stops.loc[mid_stop_seq_idx + 1, 'stop_id']
-                    covered_stop_pairs.loc[cnt, 'next_stop_loc'] = cmp_stops.loc[mid_stop_seq_idx + 1, 'stop_loc']
-                    cnt = cnt + 1
+#                 # Break stop pairs at skipped stops, if any
+#                 for mid_stop_seq_idx in range(cur_stop_seq_idx, next_stop_seq_idx):
+#                     covered_stop_pairs.loc[cnt, 'cmp_segid'] = cmp_segid
+#                     covered_stop_pairs.loc[cnt, 'cur_stop_id'] = cmp_stops.loc[mid_stop_seq_idx, 'stop_id']
+#                     covered_stop_pairs.loc[cnt, 'cur_stop_loc'] = cmp_stops.loc[mid_stop_seq_idx, 'stop_loc']
+#                     covered_stop_pairs.loc[cnt, 'next_stop_id'] = cmp_stops.loc[mid_stop_seq_idx + 1, 'stop_id']
+#                     covered_stop_pairs.loc[cnt, 'next_stop_loc'] = cmp_stops.loc[mid_stop_seq_idx + 1, 'stop_loc']
+#                     cnt = cnt + 1
 
-    # Get a unique list of stop pairs accounted for the stop-skipping issue
-    covered_stop_pairs_unique = covered_stop_pairs.drop_duplicates()
-    covered_stop_pairs_unique['dist'] = abs(covered_stop_pairs_unique['next_stop_loc'] - covered_stop_pairs_unique['cur_stop_loc'])
+#     # Get a unique list of stop pairs accounted for the stop-skipping issue
+#     covered_stop_pairs_unique = covered_stop_pairs.drop_duplicates()
+#     covered_stop_pairs_unique['dist'] = abs(covered_stop_pairs_unique['next_stop_loc'] - covered_stop_pairs_unique['cur_stop_loc'])
 
     # ### Manually Matched Pairs 
     pair_cnt = len(apc_pairs)
@@ -435,108 +439,89 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, timep):
     
                         pair_cnt = pair_cnt + 1
 
-
-    cnt = len(covered_stop_pairs_unique)
-    for cur_stop_idx in range(len(overlap_pairs)):
-        covered_stop_pairs_unique.loc[cnt, 'cmp_segid'] = overlap_pairs.loc[cur_stop_idx, 'cmp_segid']
-        covered_stop_pairs_unique.loc[cnt, 'cur_stop_id'] = overlap_pairs.loc[cur_stop_idx, 'pre_stopid']
-        covered_stop_pairs_unique.loc[cnt, 'next_stop_id'] = overlap_pairs.loc[cur_stop_idx, 'next_stopid']
-        covered_stop_pairs_unique.loc[cnt, 'dist'] = overlap_pairs.loc[cur_stop_idx, 'cmp_overlap_len']
-        cnt = cnt + 1
+#     cnt = len(covered_stop_pairs_unique)
+#     for cur_stop_idx in range(len(overlap_pairs)):
+#         covered_stop_pairs_unique.loc[cnt, 'cmp_segid'] = overlap_pairs.loc[cur_stop_idx, 'cmp_segid']
+#         covered_stop_pairs_unique.loc[cnt, 'cur_stop_id'] = overlap_pairs.loc[cur_stop_idx, 'pre_stopid']
+#         covered_stop_pairs_unique.loc[cnt, 'next_stop_id'] = overlap_pairs.loc[cur_stop_idx, 'next_stopid']
+#         covered_stop_pairs_unique.loc[cnt, 'dist'] = overlap_pairs.loc[cur_stop_idx, 'cmp_overlap_len']
+#         cnt = cnt + 1
     
-    covered_cmp_len = covered_stop_pairs_unique.groupby(['cmp_segid']).agg({'cur_stop_id': 'count', 'dist': 'sum'}).reset_index()
-    covered_cmp_len.columns = ['cmp_segid', 'pair_cnt', 'pair_len']
-    covered_cmp_len['cmp_segid'] = covered_cmp_len['cmp_segid'].astype(int)
+#     covered_cmp_len = covered_stop_pairs_unique.groupby(['cmp_segid']).agg({'cur_stop_id': 'count', 'dist': 'sum'}).reset_index()
+#     covered_cmp_len.columns = ['cmp_segid', 'pair_cnt', 'pair_len']
+#     covered_cmp_len['cmp_segid'] = covered_cmp_len['cmp_segid'].astype(int)
     
-    covered_cmp_len_ratio = pd.merge(covered_cmp_len, cmp_segs_prj, on='cmp_segid')
-    covered_cmp_len_ratio['len_ratio'] = round(100 * covered_cmp_len_ratio['pair_len']/covered_cmp_len_ratio['Length'], 2)
+#     covered_cmp_len_ratio = pd.merge(covered_cmp_len, cmp_segs_prj, on='cmp_segid')
+#     covered_cmp_len_ratio['len_ratio'] = round(100 * covered_cmp_len_ratio['pair_len']/covered_cmp_len_ratio['Length'], 2)
     
-    # Update cur_next_loc_dis between stop pairs if revenue distance is greater than the stop pair distance, which could occur
-    # if one of or both matched stops are outside the cmp segment
     apc_pairs['cur_next_loc_dis'] = np.where(apc_pairs['cur_next_loc_dis'] >= apc_pairs['cur_next_rev_dis'], 
                                             apc_pairs['cur_next_loc_dis'],
                                             apc_pairs['cur_next_rev_dis'])
-    apc_pairs['speed_rev_dis'] = 3600* apc_pairs['cur_next_rev_dis']/apc_pairs['cur_next_time']
-    apc_pairs['speed_loc_dis'] = 3600* apc_pairs['cur_next_loc_dis']/apc_pairs['cur_next_time']
-    
-    apc_pairs.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_%s_update_manual.csv' %timep), index=False)
     
     apc_pairs_clean = apc_pairs[apc_pairs['cur_stop_dwell_time']<180]
     apc_trip_speeds = apc_pairs_clean.groupby(['cmp_segid', 'trip_id', 'trip_date']).agg({'cur_next_loc_dis': 'sum',
-                                                                       'cur_next_rev_dis': 'sum',
                                                                         'cur_next_time': 'sum'}).reset_index()
-    apc_trip_speeds.columns = ['cmp_segid', 'trip_id', 'trip_date', 
-                              'trip_stop_distance', 'trip_rev_distance', 'trip_traveltime']
+    apc_trip_speeds.columns = ['cmp_segid', 'trip_id', 'trip_date', 'trip_stop_distance', 'trip_traveltime']
     apc_trip_speeds['trip_loc_speed'] = 3600* apc_trip_speeds['trip_stop_distance']/apc_trip_speeds['trip_traveltime']
-    apc_trip_speeds['trip_rev_speed'] = 3600* apc_trip_speeds['trip_rev_distance']/apc_trip_speeds['trip_traveltime']
+    
+    apc_trip_speeds = pd.merge(apc_trip_speeds, cmp_segs_prj[['cmp_segid', 'length']], on='cmp_segid', how='left')
+    apc_trip_speeds['len_ratio'] = 100*apc_trip_speeds['trip_stop_distance']/apc_trip_speeds['length']
+    
     apc_trip_speeds.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Trips_%s_update_manual_Oct22.csv' %timep), index=False)
     
-    apc_cmp_speeds = apc_trip_speeds.groupby(['cmp_segid']).agg({'trip_stop_distance': 'sum',
-                                                                       'trip_rev_distance': 'sum',
-                                                                        'trip_traveltime': 'sum',
-                                                                       'trip_loc_speed': 'std',
-                                                                       'trip_rev_speed': 'std',
+    # Only include trips covering at least 50% of CMP length
+    apc_trip_speeds_over50 = apc_trip_speeds[apc_trip_speeds['len_ratio']>=50]
+    apc_cmp_speeds = apc_trip_speeds_over50.groupby(['cmp_segid']).agg({'trip_loc_speed': ['mean', 'std'],
                                                                         'trip_id': 'count'}).reset_index()
-    apc_cmp_speeds.columns = ['cmp_segid', 'total_stop_distance', 'total_rev_distance',
-                                 'total_traveltime', 'std_loc_speed', 'std_rev_speed', 'sample_size']
-    apc_cmp_speeds['avg_loc_speed'] = 3600* apc_cmp_speeds['total_stop_distance']/apc_cmp_speeds['total_traveltime']
-    apc_cmp_speeds['avg_rev_speed'] = 3600* apc_cmp_speeds['total_rev_distance']/apc_cmp_speeds['total_traveltime']
-    apc_cmp_speeds['cov_loc_speed'] = 100* apc_cmp_speeds['std_loc_speed']/apc_cmp_speeds['avg_loc_speed']
-    apc_cmp_speeds['cov_rev_speed'] = 100* apc_cmp_speeds['std_rev_speed']/apc_cmp_speeds['avg_rev_speed']
     
-    apc_cmp_speeds = pd.merge(apc_cmp_speeds, covered_cmp_len_ratio[['cmp_segid', 'pair_len', 'Length', 'len_ratio']], on='cmp_segid', how='left')
+    apc_cmp_speeds.columns = ['cmp_segid', 'avg_speed', 'std_dev', 'sample_size']
+    apc_cmp_speeds['cov_2019'] = 100* apc_cmp_speeds['std_dev']/apc_cmp_speeds['avg_speed']
+    
+    apc_cmp_speeds['year'] = 2019
+    apc_cmp_speeds['source'] = 'APC'
+    apc_cmp_speeds['period'] = timep
+    
     return apc_cmp_speeds
 
+
 # ## AM 
-apc_cmp_speeds_am = match_intermediate_apc_stops(apc_pairs_am, apc_cmp_am, 'AM')
+apc_cmp_speeds_am = match_intermediate_apc_stops(apc_pairs_am, apc_cmp_am, overlap_pairs, cmp_segs_prj, 'AM')
+
 # ## PM 
-apc_cmp_speeds_pm = match_intermediate_apc_stops(apc_pairs_pm, apc_cmp_pm, 'PM')
+apc_cmp_speeds_pm = match_intermediate_apc_stops(apc_pairs_pm, apc_cmp_pm, overlap_pairs, cmp_segs_prj, 'PM')
 
 # ## Combine AM and PM 
-apc_cmp_speeds_am['period'] = 'AM'
-apc_cmp_speeds_pm['period'] = 'PM'
 apc_cmp_speeds = apc_cmp_speeds_am.append(apc_cmp_speeds_pm, ignore_index=True)
+apc_cmp_speeds = apc_cmp_speeds[apc_cmp_speeds['sample_size']>=9]  #Minimum sample size is set at 10, but one segment with 9 samples seems to have reasonable results, so it is retained 
+print('Number of segment-periods ', len(apc_cmp_speeds))
 
-apc_cmp_speeds['len_ratio'] = np.where(apc_cmp_speeds['len_ratio']>100, 100, apc_cmp_speeds['len_ratio'])
+out_cols = ['cmp_segid', 'year', 'source', 'period', 'avg_speed', 'std_dev', 'cov_2019', 'sample_size']
+apc_cmp_speeds[out_cols].to_csv(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Speeds_2019_Final.csv'), index=False)
 
-apc_cmp_speeds.to_csv(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Trip_Speeds.csv'), index=False)
 
-cmp_segs_apc_am = cmp_segs_org.merge(apc_cmp_speeds_am, on='cmp_segid', how='left')
-cmp_segs_apc_am['period'] = 'AM'
-cmp_segs_apc_pm = cmp_segs_org.merge(apc_cmp_speeds_pm, on='cmp_segid', how='left')
-cmp_segs_apc_pm['period'] = 'PM'
-cmp_segs_apc = cmp_segs_apc_am.append(cmp_segs_apc_pm, ignore_index=True)
-cmp_segs_apc.crs = wgs84
-cmp_segs_apc.to_file(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Trips_Speeds.shp'))
-
-apc_cmp_speeds_over50 = apc_cmp_speeds[apc_cmp_speeds['len_ratio']>=50]
-print('Number of final segment-periods ', len(apc_cmp_speeds_over50))
-
-out_cols = ['cmp_segid', 'period', 'avg_loc_speed', 'std_loc_speed', 'cov_loc_speed', 'avg_rev_speed', 'std_rev_speed', 'cov_rev_speed', 'len_ratio']
-apc_cmp_speeds_over50[out_cols].to_csv(os.path.join(MAIN_DIR, 'SF_CMP_Transit_Speeds_Over50%_update.csv'), index=False)
-
-# Generate sample size distribution graph
-# Create sample size groups
-apc_cmp_speeds_over50['group_id'] = np.where(apc_cmp_speeds_over50['sample_size']<50, 0,
-                                          np.where(apc_cmp_speeds_over50['sample_size']<100, 1,
-                                                   np.where(apc_cmp_speeds_over50['sample_size']<250, 2,
-                                                            np.where(apc_cmp_speeds_over50['sample_size']<500, 3,
-                                                                     np.where(apc_cmp_speeds_over50['sample_size']<1000, 4,
-                                                                              np.where(apc_cmp_speeds_over50['sample_size']<2000, 5,
+# Get sample size distribution
+apc_cmp_speeds['group_id'] = np.where(apc_cmp_speeds['sample_size']<50, 0,
+                                          np.where(apc_cmp_speeds['sample_size']<100, 1,
+                                                   np.where(apc_cmp_speeds['sample_size']<250, 2,
+                                                            np.where(apc_cmp_speeds['sample_size']<500, 3,
+                                                                     np.where(apc_cmp_speeds['sample_size']<1000, 4,
+                                                                              np.where(apc_cmp_speeds['sample_size']<2000, 5,
                                                                                        6
                                          ))))))
-apc_cmp_speeds_over50['group_range'] = np.where(apc_cmp_speeds_over50['sample_size']<50, '0-50',
-                                          np.where(apc_cmp_speeds_over50['sample_size']<100, '50-100',
-                                                   np.where(apc_cmp_speeds_over50['sample_size']<250, '100-250',
-                                                            np.where(apc_cmp_speeds_over50['sample_size']<500, '250-500',
-                                                                     np.where(apc_cmp_speeds_over50['sample_size']<1000, '500-1000',
-                                                                              np.where(apc_cmp_speeds_over50['sample_size']<2000, '1000-2000',
+
+apc_cmp_speeds['group_range'] = np.where(apc_cmp_speeds['sample_size']<50, '0-50',
+                                          np.where(apc_cmp_speeds['sample_size']<100, '50-100',
+                                                   np.where(apc_cmp_speeds['sample_size']<250, '100-250',
+                                                            np.where(apc_cmp_speeds['sample_size']<500, '250-500',
+                                                                     np.where(apc_cmp_speeds['sample_size']<1000, '500-1000',
+                                                                              np.where(apc_cmp_speeds['sample_size']<2000, '1000-2000',
                                                                                        '>2000'
                                          ))))))
-apc_cmp_count = apc_cmp_speeds_over50.groupby(['group_id', 'group_range', 'period']).cmp_segid.count().reset_index()
+
+apc_cmp_count = apc_cmp_speeds.groupby(['group_id', 'group_range', 'period']).cmp_segid.count().reset_index()
 apc_cmp_count.columns = ['group_id', 'group_range', 'period', 'count']
 
-# Generate graph
+# Generate sample size distribution graph
 import matplotlib.pyplot as plt
 n_groups = 7
 fig, ax = plt.subplots(figsize=(10,5))
@@ -572,5 +557,5 @@ ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
 
 plt.tight_layout()
-plt.savefig(os.path.join(MAIN_DIR, 'Sample_Size_Distribution.png'), bbox_inches = 'tight')
+plt.savefig(os.path.join(MAIN_DIR, 'Sample_Size_Distribution_TripOver50%CMP.png'), bbox_inches = 'tight')
 plt.show()
