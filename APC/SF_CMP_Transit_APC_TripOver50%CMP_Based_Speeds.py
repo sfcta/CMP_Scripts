@@ -315,7 +315,7 @@ apc_pairs_am['cur_next_loc_dis'] = np.where(apc_pairs_am['cmp_segid']==175,
                                      abs(apc_pairs_am['next_stop_loc'] - apc_pairs_am['cur_stop_loc']) / 5280,
                                       apc_pairs_am['next_stop_loc'])
 
-apc_pairs_am.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_AM.csv'), index=False)
+#apc_pairs_am.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_AM.csv'), index=False)
 
 
 # ## PM 
@@ -344,7 +344,7 @@ apc_pairs_pm['cur_next_loc_dis'] = np.where(apc_pairs_pm['cmp_segid']==175,
                                             abs(apc_pairs_pm['next_stop_loc'] - apc_pairs_pm['cur_stop_loc']) / 5280,
                                             apc_pairs_pm['next_stop_loc'])
 
-apc_pairs_pm.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_PM.csv'), index=False)
+#apc_pairs_pm.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_PM.csv'), index=False)
 
 
 # ## Stop and Segment Matching 
@@ -491,6 +491,7 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj
     
 #     covered_cmp_len_ratio = pd.merge(covered_cmp_len, cmp_segs_prj, on='cmp_segid')
 #     covered_cmp_len_ratio['len_ratio'] = round(100 * covered_cmp_len_ratio['pair_len']/covered_cmp_len_ratio['Length'], 2)
+    apc_pairs.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_%s_update_manual.csv' %timep), index=False)
     
     apc_pairs['cur_next_loc_dis'] = np.where(apc_pairs['cur_next_loc_dis'] >= apc_pairs['cur_next_rev_dis'], 
                                             apc_pairs['cur_next_loc_dis'],
@@ -505,7 +506,7 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj
     apc_trip_speeds = pd.merge(apc_trip_speeds, cmp_segs_prj[['cmp_segid', 'length']], on='cmp_segid', how='left')
     apc_trip_speeds['len_ratio'] = 100*apc_trip_speeds['trip_stop_distance']/apc_trip_speeds['length']
     
-    apc_trip_speeds.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Trips_%s_update_manual_Oct22.csv' %timep), index=False)
+    apc_trip_speeds.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Trips_%s_update_manual.csv' %timep), index=False)
     
     # Only include trips covering at least 50% of CMP length
     apc_trip_speeds_over50 = apc_trip_speeds[apc_trip_speeds['len_ratio']>=50]
