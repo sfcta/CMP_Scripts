@@ -313,7 +313,7 @@ apc_pairs_am['next_stop_loc'] = np.where(apc_pairs_am['cmp_segid']==175,
                                       apc_pairs_am['next_stop_loc'])
 apc_pairs_am['cur_next_loc_dis'] = np.where(apc_pairs_am['cmp_segid']==175,
                                      abs(apc_pairs_am['next_stop_loc'] - apc_pairs_am['cur_stop_loc']) / 5280,
-                                      apc_pairs_am['next_stop_loc'])
+                                      apc_pairs_am['cur_next_loc_dis'])
 
 #apc_pairs_am.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_AM.csv'), index=False)
 
@@ -342,7 +342,7 @@ apc_pairs_pm['next_stop_loc'] = np.where(apc_pairs_pm['cmp_segid']==175,
                                       apc_pairs_pm['next_stop_loc'])
 apc_pairs_pm['cur_next_loc_dis'] = np.where(apc_pairs_pm['cmp_segid']==175,
                                             abs(apc_pairs_pm['next_stop_loc'] - apc_pairs_pm['cur_stop_loc']) / 5280,
-                                            apc_pairs_pm['next_stop_loc'])
+                                            apc_pairs_pm['cur_next_loc_dis'])
 
 #apc_pairs_pm.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_PM.csv'), index=False)
 
