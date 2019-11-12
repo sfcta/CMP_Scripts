@@ -50,6 +50,8 @@ inrix_net['RoadName'] = inrix_net['RoadName'].str.lower()
 
 cmp_inrix_corr = pd.read_csv(os.path.join(NETCONF_DIR, 'CMP_Segment_INRIX_Links_Correspondence.csv'))
 
+print('------------Matching transit stops to CMP segments------------')
+
 # Create a buffer zone for each cmp segment
 ft=160   # According to the memo from last CMP cycle
 mt=round(ft/3.2808,4)
@@ -133,7 +135,7 @@ for remove_idx in range(len(remove_cmp_stop)):
     remove_df_idx = cmp_segs_near.index[(cmp_segs_near['cmp_segid']==rmv_cmp_id) & (cmp_segs_near['stop_id']==rmv_stop_id)].tolist()[0]
     cmp_segs_near = cmp_segs_near.drop([remove_df_idx], axis=0)
 
-
+print('------------Preprocessing raw APC data------------')
 # Preprocess APC data
 apc_fields = ['EXT_TRIP_ID', 'DIRECTION', 'ACTUAL_DATE', 'VEHICLE_ID', 'CALC_SPEED', 
             'REV_DISTANCE', 'OPEN_DATE_TIME', 'DWELL_TIME', 'CLOSE_DATE_TIME', 'STOPID']
@@ -295,7 +297,25 @@ apc_cmp_am = apc_cmp_am.sort_values(by=['EXT_TRIP_ID', 'ACTUAL_DATE', 'VEHICLE_I
 
 print('------------Start processing AM trips------------')
 apc_pairs_am = match_stop_pairs_to_cmp(apc_cmp_am, stops_near_cmp_list, cmp_segs_near, cmp_segs_prj, angle_thrd)
-#apc_pairs_am.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_AM_Oct22.csv'), index=False)
+
+# Update the stop location for CMP 175 due to its irregular geometry
+apc_pairs_am['cur_stop_loc'] = np.where(apc_pairs_am['cmp_segid']==175,
+                                     np.where(apc_pairs_am['cur_stop_id']==5543, 173.935,
+                                             np.where(apc_pairs_am['cur_stop_id']==5545, 1020.629,
+                                                     np.where(apc_pairs_am['cur_stop_id']==5836, 1804.72,
+                                                             np.where(apc_pairs_am['cur_stop_id']==5835, 2685.807, apc_pairs_am['cur_stop_loc'])))),
+                                      apc_pairs_am['cur_stop_loc'])
+apc_pairs_am['next_stop_loc'] = np.where(apc_pairs_am['cmp_segid']==175,
+                                     np.where(apc_pairs_am['next_stop_id']==5543, 173.935,
+                                             np.where(apc_pairs_am['next_stop_id']==5545, 1020.629,
+                                                     np.where(apc_pairs_am['next_stop_id']==5836, 1804.72,
+                                                             np.where(apc_pairs_am['next_stop_id']==5835, 2685.807, apc_pairs_am['next_stop_loc'])))),
+                                      apc_pairs_am['next_stop_loc'])
+apc_pairs_am['cur_next_loc_dis'] = np.where(apc_pairs_am['cmp_segid']==175,
+                                     abs(apc_pairs_am['next_stop_loc'] - apc_pairs_am['cur_stop_loc']) / 5280,
+                                      apc_pairs_am['next_stop_loc'])
+
+#apc_pairs_am.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_AM.csv'), index=False)
 
 
 # ## PM 
@@ -306,7 +326,25 @@ apc_cmp_pm = apc_cmp_pm.sort_values(by=['EXT_TRIP_ID', 'ACTUAL_DATE', 'VEHICLE_I
 
 print('------------Start processing PM trips------------')
 apc_pairs_pm = match_stop_pairs_to_cmp(apc_cmp_pm, stops_near_cmp_list, cmp_segs_near, cmp_segs_prj, angle_thrd)
-#apc_pairs_pm.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_PM_Oct22.csv'), index=False)
+
+# Update the stop location for CMP 175 due to its irregular geometry
+apc_pairs_pm['cur_stop_loc'] = np.where(apc_pairs_pm['cmp_segid']==175,
+                                     np.where(apc_pairs_pm['cur_stop_id']==5543, 173.935,
+                                             np.where(apc_pairs_pm['cur_stop_id']==5545, 1020.629,
+                                                     np.where(apc_pairs_pm['cur_stop_id']==5836, 1804.72,
+                                                             np.where(apc_pairs_pm['cur_stop_id']==5835, 2685.807, apc_pairs_pm['cur_stop_loc'])))),
+                                      apc_pairs_pm['cur_stop_loc'])
+apc_pairs_pm['next_stop_loc'] = np.where(apc_pairs_pm['cmp_segid']==175,
+                                     np.where(apc_pairs_pm['next_stop_id']==5543, 173.935,
+                                             np.where(apc_pairs_pm['next_stop_id']==5545, 1020.629,
+                                                     np.where(apc_pairs_pm['next_stop_id']==5836, 1804.72,
+                                                             np.where(apc_pairs_pm['next_stop_id']==5835, 2685.807, apc_pairs_pm['next_stop_loc'])))),
+                                      apc_pairs_pm['next_stop_loc'])
+apc_pairs_pm['cur_next_loc_dis'] = np.where(apc_pairs_pm['cmp_segid']==175,
+                                            abs(apc_pairs_pm['next_stop_loc'] - apc_pairs_pm['cur_stop_loc']) / 5280,
+                                            apc_pairs_pm['next_stop_loc'])
+
+#apc_pairs_pm.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_PM.csv'), index=False)
 
 
 # ## Stop and Segment Matching 
@@ -453,6 +491,7 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj
     
 #     covered_cmp_len_ratio = pd.merge(covered_cmp_len, cmp_segs_prj, on='cmp_segid')
 #     covered_cmp_len_ratio['len_ratio'] = round(100 * covered_cmp_len_ratio['pair_len']/covered_cmp_len_ratio['Length'], 2)
+    apc_pairs.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Pairs_%s_update_manual.csv' %timep), index=False)
     
     apc_pairs['cur_next_loc_dis'] = np.where(apc_pairs['cur_next_loc_dis'] >= apc_pairs['cur_next_rev_dis'], 
                                             apc_pairs['cur_next_loc_dis'],
@@ -467,7 +506,7 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj
     apc_trip_speeds = pd.merge(apc_trip_speeds, cmp_segs_prj[['cmp_segid', 'length']], on='cmp_segid', how='left')
     apc_trip_speeds['len_ratio'] = 100*apc_trip_speeds['trip_stop_distance']/apc_trip_speeds['length']
     
-    apc_trip_speeds.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Stop_Trips_%s_update_manual_Oct22.csv' %timep), index=False)
+    apc_trip_speeds.to_csv(os.path.join(MAIN_DIR, 'APC_2019_Trips_%s_update_manual.csv' %timep), index=False)
     
     # Only include trips covering at least 50% of CMP length
     apc_trip_speeds_over50 = apc_trip_speeds[apc_trip_speeds['len_ratio']>=50]
