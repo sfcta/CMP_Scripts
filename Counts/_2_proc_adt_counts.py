@@ -46,3 +46,7 @@ df_all = df_id[['ID','Desc']].merge(df_all)
 df_all['ID'] = df_all['ID'].astype(int)
 df_all = df_all.sort_values(['ID','Direction','Period'])
 df_all.to_csv(r'Q:\CMP\LOS Monitoring 2019\Counts\ADT\adt_processed.csv', header=True, index=False)
+
+# df_19 = df_id[['ID','Desc']].merge(df_19)
+# df_19['ID'] = df_19['ID'].astype(int)
+# df_19.to_csv(r'Q:\CMP\LOS Monitoring 2019\Counts\ADT\adt_processed_2019.csv', header=True, index=False)
