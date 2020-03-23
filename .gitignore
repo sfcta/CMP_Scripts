@@ -106,3 +106,6 @@ venv.bak/
 # PyDev project settings
 .project
 .pydevproject
+
+# bak folders
+bak/
