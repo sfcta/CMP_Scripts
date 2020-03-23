@@ -9,11 +9,11 @@ warnings.filterwarnings("ignore")
 
 # UK Paths
 NETCONF_DIR = r'S:\CMP\Network Conflation'
-SPEED_DIR = r'S:\CMP\Auto LOS'
+OUT_DIR = r'S:\CMP\Auto LOS'
 
 # SFCTA Paths
 #NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2019\Network_Conflation'
-#SPEED_DIR = r'Q:\CMP\LOS Monitoring 2019'
+#OUT_DIR = r'Q:\CMP\LOS Monitoring 2019'
 
 
 # Input CMP segment shapefile
@@ -25,17 +25,17 @@ conf_len=conflation.groupby('CMP_SegID').Length_Matched.sum().reset_index()
 conf_len.columns = ['CMP_SegID', 'CMP_Length']
 
 # Read in the INRIX data using dask to save memory
-filename1 = os.path.join(SPEED_DIR, 'SF_CMP__2019-04-02_to_2019-05-15_1_min_part_1\SF_CMP__2019-04-02_to_2019-05-15_1_min_part_1\data.csv')
+filename1 = os.path.join(OUT_DIR, 'SF_CMP__2019-04-02_to_2019-05-15_1_min_part_1\SF_CMP__2019-04-02_to_2019-05-15_1_min_part_1\data.csv')
 df1 = dd.read_csv(filename1, assume_missing=True)
 df1['Segment ID'] = df1['Segment ID'].astype('int')
 df1_cmp = df1[df1['Segment ID'].isin(conflation['INRIX_SegID'])]
 
-filename2 = os.path.join(SPEED_DIR, 'SF_CMP__2019-04-02_to_2019-05-15_1_min_part_2\SF_CMP__2019-04-02_to_2019-05-15_1_min_part_2\data.csv')
+filename2 = os.path.join(OUT_DIR, 'SF_CMP__2019-04-02_to_2019-05-15_1_min_part_2\SF_CMP__2019-04-02_to_2019-05-15_1_min_part_2\data.csv')
 df2 = dd.read_csv(filename2, assume_missing=True)
 df2['Segment ID'] = df2['Segment ID'].astype('int')
 df2_cmp = df2[df2['Segment ID'].isin(conflation['INRIX_SegID'])]
 
-filename3 = os.path.join(SPEED_DIR, 'SF_CMP__2019-04-02_to_2019-05-15_1_min_part_3\SF_CMP__2019-04-02_to_2019-05-15_1_min_part_3\data.csv')
+filename3 = os.path.join(OUT_DIR, 'SF_CMP__2019-04-02_to_2019-05-15_1_min_part_3\SF_CMP__2019-04-02_to_2019-05-15_1_min_part_3\data.csv')
 df3 = dd.read_csv(filename3, assume_missing=True)
 df3['Segment ID'] = df3['Segment ID'].astype('int')
 df3_cmp = df3[df3['Segment ID'].isin(conflation['INRIX_SegID'])]
@@ -290,4 +290,4 @@ cmp_am_agg = cmp_seg_level_speed_and_los(df_cmp_am, cmp_segs, conf_len, ss_thres
 cmp_pm_agg = cmp_seg_level_speed_and_los(df_cmp_pm, cmp_segs, conf_len, ss_threshold, cur_year = 2019, cur_period = 'PM')
 
 cmp_segs_los = cmp_am_agg.append(cmp_pm_agg, ignore_index=True)
-cmp_segs_los.to_csv(os.path.join(SPEED_DIR, 'CMP 2019 Auto LOS v1.csv'), index=False)
+cmp_segs_los.to_csv(os.path.join(OUT_DIR, 'CMP 2019 Auto LOS v1.csv'), index=False)
