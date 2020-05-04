@@ -253,19 +253,39 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
     if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name']=='Doyle/Lombard/Richardson':
         cmp_names = cmp_names + ['us-101', 'us 101']
     if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name']=='Duboce/Division':
-        cmp_names = cmp_names + ['13th st']
+        cmp_names = cmp_names + ['13th st', '13th street', 'central freeway']
     if (cmp_seg_id==147) or (cmp_seg_id==148):
         cmp_names = cmp_names + ['kennedy']
     if (cmp_seg_id==26) or (cmp_seg_id==27):
         cmp_names = cmp_names + ['veterans']  
     
     # v2001 updates
-    if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name']=='19th Ave/Park Presidio':
+    if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name'] in ['19th Ave/Park Presidio', 'Junipero Serra']:
         cmp_names = cmp_names + ['ca 1']
-    if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name']=='Skyline':
+    if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name'] in ['Skyline', 'Sloat']:
         cmp_names = cmp_names + ['ca 35']
-    if (cmp_seg_id==242):
+    if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name']=='I-80':
+        cmp_names = cmp_names + ['i 80', 'james lick freeway']
+    if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name']=='I-280':
+        cmp_names = cmp_names + ['i 280']
+    if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name'] in ['US-101']:
+        cmp_names = cmp_names + ['us 101', 'central freeway']
+    if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name'] in ['Van Ness/S VanNess']:
         cmp_names = cmp_names + ['us 101']
+    if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name'] in ['Geary']:
+        cmp_names = cmp_names + ['geary boulevard', 'point lobos avenue']
+    if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name'] in ['Guerrero/San Jose']:
+        cmp_names = cmp_names + ['san jose avenue']
+    if cmp_segs_prj.loc[cmp_seg_idx]['cmp_name'] in ['Harrison']:
+        cmp_names = cmp_names + ['harrison street']
+    if (cmp_seg_id==52) or (cmp_seg_id==47):
+        cmp_names = ['robert c levy tunnel']
+    if (cmp_seg_id==192) or (cmp_seg_id==193):
+        cmp_names = ['octavia boulevard']
+    if (cmp_seg_id==150):
+        cmp_names = ['main street']
+    if (cmp_seg_id==175):
+        cmp_names = ['mission street', 'otis street']
         
     inrix_lns_within = inrix_lines_within[inrix_lines_within['cmp_segid']==cmp_seg_id]
     inrix_lns_idx = inrix_lines_within.index[inrix_lines_within['cmp_segid']==cmp_seg_id].tolist()
@@ -400,7 +420,13 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
             preNode = inrix_lines_matched_final.loc[inrix_matched_first_idx]['B_NodeID']
             found = 0
             matched = 0
+            GAP_COUNTER = 0
             while inrix_matched_first_b_dis/cmp_seg_len > gap_thrhd:
+                GAP_COUNTER += 1
+                if GAP_COUNTER==50:
+                    print('Backward Search Loop')
+                    print('Gap threshold issue: match_ratio= %s, check cmpid= %s' %(round(inrix_matched_first_b_dis/cmp_seg_len,3), cmp_seg_id))
+                    break
                 preLinks = inrix_lines_intersect[(inrix_lines_intersect['cmp_segid'] == cmp_seg_id) & (inrix_lines_intersect['E_NodeID'] == preNode)]
                 if len(preLinks)==0:
                     cmp_segs_prj.loc[cmp_seg_idx, 'CMP_B_Indt'] = 'Previous links not found'
@@ -518,7 +544,13 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
             nextNode = inrix_lines_matched_final.loc[inrix_matched_first_idx]['E_NodeID']
             found = 0
             matched = 0
+            GAP_COUNTER = 0
             while inrix_matched_e_dis/cmp_seg_len > gap_thrhd:
+                GAP_COUNTER += 1
+                if GAP_COUNTER==50:
+                    print('Forward Search Loop')
+                    print('Gap threshold issue: match_ratio= %s, check cmpid= %s' %(round(inrix_matched_e_dis/cmp_seg_len,3), cmp_seg_id))
+                    break
                 if len(inrix_lns_matched[inrix_lns_matched['B_NodeID']==nextNode])==1:
                     matched_link_next = inrix_lns_matched[inrix_lns_matched['B_NodeID']==nextNode]
                     inrix_matched_e_dis = matched_link_next.INX_E_CMP_E.item()
@@ -756,9 +788,8 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
             GAP_COUNTER = 0
             while inrix_matched_e_dis/cmp_seg_len > gap_thrhd:
                 GAP_COUNTER += 1
-                if GAP_COUNTER%10 == 0:
-                    print(GAP_COUNTER)
                 if GAP_COUNTER==50:
+                    print('Zero Match Loop')
                     print('Gap threshold issue: match_ratio= %s, check cmpid= %s' %(round(inrix_matched_e_dis/cmp_seg_len,3), cmp_seg_id))
                     break
                 nextLinks = inrix_lines_intersect[(inrix_lines_intersect['cmp_segid'] == cmp_seg_id) & (inrix_lines_intersect['B_NodeID'] == nextNode)]

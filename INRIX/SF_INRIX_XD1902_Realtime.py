@@ -7,10 +7,20 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # SFCTA Paths
-NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2019\Network_Conflation\XD map 19_02'
+# NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2019\Network_Conflation\XD map 19_02'
+# CORR_FILE = 'CMP_Segment_INRIX_XD1902_Links_Correspondence.csv'
+NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2019\Network_Conflation\XD_20_01'
+CORR_FILE = 'CMP_Segment_INRIX_Links_Correspondence_2001_Manual.csv'
+
 DATA_DIR = r'Q:\Data\Observed\Streets\INRIX'
+
 OUT_DIR = r'Q:\CMP\LOS Monitoring 2019\Auto_LOS'
-OUT_FILE = 'Mar2020_AutoSpeeds.csv'
+# OUT_FILE = 'Mar2020_AutoSpeeds.csv'
+# INPUT_PATHS = [['All_SF_2020-03-02_to_2020-03-20_1_min_part_', 7],
+#                ['All_SF_2020-03-20_to_2020-03-28_1_min_part_', 4]]
+OUT_FILE = 'Apr2020_AutoSpeeds.csv'
+INPUT_PATHS = [['All_SF_2020-03-30_to_2020-04-12_1_min_part_', 6],
+               ['All_SF_2020-04-12_to_2020-04-20_1_min_part_', 4]]
 
 # Minimum sample size per day per peak period
 ss_threshold = 10
@@ -19,18 +29,20 @@ ss_threshold = 10
 cmp_segs=gp.read_file(os.path.join(NETCONF_DIR, 'cmp_roadway_segments.shp'))
 
 # Get CMP and INRIX correspondence table
-conflation = pd.read_csv(os.path.join(NETCONF_DIR, 'CMP_Segment_INRIX_XD1902_Links_Correspondence.csv'))
+conflation = pd.read_csv(os.path.join(NETCONF_DIR, CORR_FILE))
+conflation[['CMP_SegID','INRIX_SegID']] = conflation[['CMP_SegID','INRIX_SegID']].astype(int)
 conf_len=conflation.groupby('CMP_SegID').Length_Matched.sum().reset_index()
 conf_len.columns = ['CMP_SegID', 'CMP_Length']
 
 # Read in the INRIX data using dask to save memory
 df_cmp = pd.DataFrame()
-for i in range(1,7):
-    df1 = dd.read_csv(os.path.join(DATA_DIR, 'All_SF_2020-03-02_to_2020-03-20_1_min_part_%s\data.csv' %i), assume_missing=True)
-    if len(df1)>0:
-        df1['Segment ID'] = df1['Segment ID'].astype('int')
-        df1 = df1[df1['Segment ID'].isin(conflation['INRIX_SegID'])]
-        df_cmp = dd.concat([df_cmp,df1],axis=0,interleave_partitions=True)
+for p in INPUT_PATHS:
+    for i in range(1,p[1]):
+        df1 = dd.read_csv(os.path.join(DATA_DIR, '%s%s\data.csv' %(p[0],i)), assume_missing=True)
+        if len(df1)>0:
+            df1['Segment ID'] = df1['Segment ID'].astype('int')
+            df1 = df1[df1['Segment ID'].isin(conflation['INRIX_SegID'])]
+            df_cmp = dd.concat([df_cmp,df1],axis=0,interleave_partitions=True)
 
 #Create date and time fields for subsequent filtering
 df_cmp['Date_Time'] = df_cmp['Date Time'].str[:16]
