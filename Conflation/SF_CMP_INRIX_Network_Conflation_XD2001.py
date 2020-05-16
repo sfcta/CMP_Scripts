@@ -926,4 +926,19 @@ inrix_lines_matched_output.columns = ['CMP_SegID', 'INRIX_SegID', 'Length_Matche
 
 # Output files
 cmp_segs_prj.to_file(cmp + '_matchedlength_check.shp')
+
+inrix_lines_matched_output[['CMP_SegID','INRIX_SegID']] = inrix_lines_matched_output[['CMP_SegID','INRIX_SegID']].astype(int)
 inrix_lines_matched_output.to_csv('CMP_Segment_INRIX_Links_Correspondence_%s.csv' %MAP_VER, index=False)
+
+MANUAL_UPDATE = True
+if MANUAL_UPDATE:
+    cols = inrix_lines_matched_output.columns
+    rem_df = pd.read_csv('manual_remove.csv')
+    rem_df['del_flag'] = 1
+    inrix_lines_matched_output = inrix_lines_matched_output.merge(rem_df, how='left')
+    inrix_lines_matched_output = inrix_lines_matched_output.loc[pd.isna(inrix_lines_matched_output['del_flag']), ]
+    
+    add_df = pd.read_csv('manual_add.csv')
+    inrix_lines_matched_output = inrix_lines_matched_output[cols]
+    inrix_lines_matched_output = inrix_lines_matched_output.append(add_df)
+    inrix_lines_matched_output.to_csv('CMP_Segment_INRIX_Links_Correspondence_%s_Manual.csv' %MAP_VER, index=False)
