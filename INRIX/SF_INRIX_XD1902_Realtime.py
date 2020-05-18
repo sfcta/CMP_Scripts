@@ -18,9 +18,13 @@ OUT_DIR = r'Q:\CMP\LOS Monitoring 2019\Auto_LOS'
 # OUT_FILE = 'Mar2020_AutoSpeeds.csv'
 # INPUT_PATHS = [['All_SF_2020-03-02_to_2020-03-20_1_min_part_', 7],
 #                ['All_SF_2020-03-20_to_2020-03-28_1_min_part_', 4]]
-OUT_FILE = 'Apr2020_AutoSpeeds.csv'
-INPUT_PATHS = [['All_SF_2020-03-30_to_2020-04-12_1_min_part_', 6],
-               ['All_SF_2020-04-12_to_2020-04-20_1_min_part_', 4]]
+
+# OUT_FILE = 'Apr2020_AutoSpeeds.csv'
+# INPUT_PATHS = [['All_SF_2020-03-30_to_2020-04-12_1_min_part_', 6],
+#                ['All_SF_2020-04-12_to_2020-04-20_1_min_part_', 4]]
+
+OUT_FILE = 'Apr2020_AutoSpeeds_2.csv'
+INPUT_PATHS = [['All_SF_2020-04-20_to_2020-05-16_1_min_part_', 11]]
 
 # Minimum sample size per day per peak period
 ss_threshold = 10
@@ -44,6 +48,7 @@ for p in INPUT_PATHS:
             df1 = df1[df1['Segment ID'].isin(conflation['INRIX_SegID'])]
             df_cmp = dd.concat([df_cmp,df1],axis=0,interleave_partitions=True)
 
+df_cmp['Segment ID'] = df_cmp['Segment ID'].astype('int')
 #Create date and time fields for subsequent filtering
 df_cmp['Date_Time'] = df_cmp['Date Time'].str[:16]
 df_cmp['Date_Time'] = df_cmp['Date_Time'].str.replace('T', " ")
