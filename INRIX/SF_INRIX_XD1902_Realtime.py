@@ -10,16 +10,17 @@ warnings.filterwarnings("ignore")
 # NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2019\Network_Conflation\XD map 19_02'
 # CORR_FILE = 'CMP_Segment_INRIX_XD1902_Links_Correspondence.csv'
 NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2019\Network_Conflation\XD_20_01'
-CORR_FILE = 'CMP_Segment_INRIX_Links_Correspondence_2001_Manual.csv'
+# CORR_FILE = 'CMP_Segment_INRIX_Links_Correspondence_2001_Manual.csv'
+CORR_FILE = 'CMP_Segment_INRIX_Links_Correspondence_2001_Manual - PLUS.csv'
 
 DATA_DIR = r'Q:\Data\Observed\Streets\INRIX\v2001'
 
 OUT_DIR = r'Q:\CMP\LOS Monitoring 2020\Auto_LOS'
-# OUT_FILE = 'Mar2020_AutoSpeeds.csv'
-# INPUT_PATHS = [['All_SF_2020-03-02_to_2020-03-20_1_min_part_', 7],
-#                ['All_SF_2020-03-20_to_2020-03-28_1_min_part_', 4]]
+OUT_FILE = 'Mar2020_AutoSpeeds.csv'
+INPUT_PATHS = [['All_SF_2020-03-02_to_2020-03-20_1_min_part_', 8],
+               ['All_SF_2020-03-20_to_2020-03-28_1_min_part_', 4]]
 
-# OUT_FILE = 'Apr2020_AutoSpeeds.csv'
+# OUT_FILE = 'Apr2020_AutoSpeeds_1.csv'
 # INPUT_PATHS = [['All_SF_2020-03-30_to_2020-04-12_1_min_part_', 6],
 #                ['All_SF_2020-04-12_to_2020-04-20_1_min_part_', 4]]
 
@@ -74,14 +75,14 @@ OUT_DIR = r'Q:\CMP\LOS Monitoring 2020\Auto_LOS'
 # OUT_FILE = 'Sep2020_AutoSpeeds_2.csv'
 # INPUT_PATHS = [['All_SF_2020-09-06_to_2020-09-13_1_min_part_', 4]]
 
-OUT_FILE = 'Sep2020_AutoSpeeds_3.csv'
-INPUT_PATHS = [['All_SF_2020-09-13_to_2020-09-20_1_min_part_', 4]]
+# OUT_FILE = 'Sep2020_AutoSpeeds_3.csv'
+# INPUT_PATHS = [['All_SF_2020-09-13_to_2020-09-20_1_min_part_', 4]]
 
 # Minimum sample size per day per peak period
 ss_threshold = 10
 
 # Input CMP segment shapefile
-cmp_segs=gp.read_file(os.path.join(NETCONF_DIR, 'cmp_roadway_segments.shp'))
+cmp_segs=gp.read_file(os.path.join(r'Q:\CMP\LOS Monitoring 2020\CMP_plus_shp', 'cmp_segments_plus.shp'))
 
 # Get CMP and INRIX correspondence table
 conflation = pd.read_csv(os.path.join(NETCONF_DIR, CORR_FILE))
