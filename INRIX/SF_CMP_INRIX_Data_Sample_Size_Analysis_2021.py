@@ -1,28 +1,37 @@
 # Import necessary packages
+from os.path import join
 import pandas as pd
 import numpy as np
 import geopandas as gp
 import dask.dataframe as dd
-from dask.diagnostics import ProgressBar
-import dask.distributed
-client = dask.distributed.Client()
+import warnings
+warnings.filterwarnings("ignore")
 
-#Read in the INRIX data using dask
-filename1 = 'Z:/SF_CMP/Data/SF_all_rds_2019-02-11_to_2019-03-24_1_min_part_1/data.csv'
-df1 = dd.read_csv(filename1, assume_missing=True)
+NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2021\Network_Conflation'
+CORR_FILE = 'CMP_Segment_INRIX_Links_Correspondence_2101_Manual - PLUS.csv'
 
-filename2 = 'Z:/SF_CMP/Data/SF_all_rds_2019-02-11_to_2019-03-24_1_min_part_2/data.csv'
-df2 = dd.read_csv(filename2, assume_missing=True)
+DATA_DIR = r'Q:\Data\Observed\Streets\INRIX\v2101'
+INPUT_PATHS = [['All_SF_2021-02-14_to_2021-03-28_1_min_part_', 8]]
 
-filename3 = 'Z:/SF_CMP/Data/SF_all_rds_2019-02-11_to_2019-03-24_1_min_part_3/data.csv'
-df3 = dd.read_csv(filename3, assume_missing=True)
-
-print(('Part 1 record #: %s, Part 2 record #: %s, Part 3 record #: %s') % (len(df1), len(df2), len(df3)))
+SHP_FILE = r'Q:\GIS\Transportation\Roads\INRIX\XD\21_01\maprelease-shapefiles\SF\Inrix_XD_2101_SF.shp'
+OUT_FILE = r'Q:\CMP\LOS Monitoring 2021\Sample_Size_Analysis\SF_INRIX_Sample_Size_SixWeeks.shp'
 
 
-#Combine three data parts
-df = dd.concat([df1,df2],axis=0,interleave_partitions=True)
-df = dd.concat([df,df3],axis=0,interleave_partitions=True)
+# Get CMP and INRIX correspondence table
+conflation = pd.read_csv(join(NETCONF_DIR, CORR_FILE))
+conflation[['CMP_SegID','INRIX_SegID']] = conflation[['CMP_SegID','INRIX_SegID']].astype(int)
+conf_len=conflation.groupby('CMP_SegID').Length_Matched.sum().reset_index()
+conf_len.columns = ['CMP_SegID', 'CMP_Length']
+
+df = pd.DataFrame()
+for p in INPUT_PATHS:
+    for i in range(1,p[1]):
+        df1 = dd.read_csv(join(DATA_DIR, '%s%s\data.csv' %(p[0],i)), assume_missing=True)
+        if len(df1)>0:
+            df1['Segment ID'] = df1['Segment ID'].astype('int')
+            df1 = df1[df1['Segment ID'].isin(conflation['INRIX_SegID'])]
+            df = dd.concat([df,df1],axis=0,interleave_partitions=True)
+
 print('Combined record #: ', len(df))
 
 #Create date and time fields for subsequent filtering
@@ -33,6 +42,7 @@ df['Day']=dd.to_datetime(df['Date_Time'])
 df['DOW']=df.Day.dt.dayofweek #Tue-1, Wed-2, Thu-3
 df['Hour']=df.Day.dt.hour
 df['Minute']=df.Day.dt.minute
+
 
 #Get AM (7-9am) speeds on Tue, Wed, and Thu
 df_am=df[((df['DOW']>=1) & (df['DOW']<=3)) & ((df['Hour']==7) | (df['Hour']==8))]
@@ -59,8 +69,7 @@ print('Number of links with speeds in AM: ', len(df_am_sum))
 print('Number of links with speeds in PM: ', len(df_pm_sum))
 
 #Read in INRIX XD network shapefile
-shp_path='Z:/SF_CMP/Data/inrixXD_SF/inrixXD_SF.shp'
-sf_shp = gp.read_file(shp_path)
+sf_shp = gp.read_file(SHP_FILE)
 print('Number of links in SF: ', len(sf_shp))
 
 #Attach the sample size measures to the shapefile
@@ -80,4 +89,4 @@ df_samplesize['ADQT_PM_30']=df_samplesize.apply(lambda x: 'Yes' if x['Pcnt_PM']>
 df_samplesize['ADQT_PM_50']=df_samplesize.apply(lambda x: 'Yes' if x['Pcnt_PM']>50 else 'No', axis=1) #50% threshold for PM
 
 #Output the combined shapefile
-df_samplesize.to_file('Z:/SF_CMP/Data/SF_INRIX_Sample_Size_SixWeeks.shp')
+df_samplesize.to_file(OUT_FILE)
