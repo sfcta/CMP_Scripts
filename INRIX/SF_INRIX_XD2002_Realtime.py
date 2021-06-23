@@ -88,11 +88,8 @@ OUT_DIR = r'Q:\CMP\LOS Monitoring 2020\Auto_LOS'
 # OUT_FILE = 'Mar2021_AutoSpeeds_2.csv'
 # INPUT_PATHS = [['All_SF_2021-03-07_to_2021-03-14_1_min_part_', 4]]
 
-# OUT_FILE = 'Mar2021_AutoSpeeds_3.csv'
-# INPUT_PATHS = [['All_SF_2021-03-14_to_2021-03-21_1_min_part_', 4]]
-
-OUT_FILE = 'Mar2021_AutoSpeeds_4.csv'
-INPUT_PATHS = [['All_SF_2021-03-21_to_2021-03-28_1_min_part_', 4]]
+OUT_FILE = 'Mar2021_AutoSpeeds_3.csv'
+INPUT_PATHS = [['All_SF_2021-03-14_to_2021-03-21_1_min_part_', 4]]
 
 
 # Minimum sample size per day per peak period
