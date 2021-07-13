@@ -18,8 +18,8 @@ OUT_DIR = r'Z:\SF_CMP\CMP2021'
 OUT_FILE = 'CMP2021_Auto_Speeds_Reliability.csv'
 INPUT_PATHS = [['SF_county_network_for_CMP2021_2021-04-05_to_2021-05-22_1_min_part_', 9]]
 
-# Minimum sample size per day per peak period
-ss_threshold = 10
+# Minimum sample size for the AM/PM monitoring period
+ss_threshold = 180
 
 # Input CMP segment shapefile
 cmp_segs=gp.read_file(os.path.join(r'Z:\SF_CMP\CMP2021\CMP_plus_shp', 'cmp_segments_plus.shp'))
