@@ -33,7 +33,7 @@ conf_len.columns = ['CMP_SegID', 'CMP_Length']
 # Read in the INRIX data using dask to save memory
 df_cmp = pd.DataFrame()
 for p in INPUT_PATHS:
-    for i in range(1,p[1]):
+    for i in range(1,p[1]+1):
         df1 = dd.read_csv(os.path.join(DATA_DIR, '%s%s\data.csv' %(p[0],i)), assume_missing=True)
         df1['Segment ID'] = df1['Segment ID'].astype('int')
         df1 = df1[df1['Segment ID'].isin(conflation['INRIX_SegID'])]
