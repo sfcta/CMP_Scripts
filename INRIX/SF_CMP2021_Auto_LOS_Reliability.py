@@ -9,12 +9,12 @@ warnings.filterwarnings("ignore")
 
 # Need to change to SFCTA Paths
 
-NETCONF_DIR = r'Z:\SF_CMP\CMP2021'
+NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2021\Network_Conflation'
 CORR_FILE = 'CMP_Segment_INRIX_Links_Correspondence_2101_Manual_PLUS_Updated.csv'
 
-DATA_DIR = r'C:\Users\xzh263\Dropbox (KTC)\SFCTA CMP\2021 CMP\INRIX'
+DATA_DIR = r'Q:\Data\Observed\Streets\INRIX\v2101'
 
-OUT_DIR = r'Z:\SF_CMP\CMP2021'
+OUT_DIR = r'Q:\CMP\LOS Monitoring 2021\Auto_LOS'
 OUT_FILE = 'CMP2021_Auto_Speeds_Reliability.csv'
 INPUT_PATHS = [['SF_county_network_for_CMP2021_2021-04-05_to_2021-05-22_1_min_part_', 9]]
 
@@ -22,7 +22,7 @@ INPUT_PATHS = [['SF_county_network_for_CMP2021_2021-04-05_to_2021-05-22_1_min_pa
 ss_threshold = 180
 
 # Input CMP segment shapefile
-cmp_segs=gp.read_file(os.path.join(r'Z:\SF_CMP\CMP2021\CMP_plus_shp', 'cmp_segments_plus.shp'))
+cmp_segs=gp.read_file(os.path.join(r'Q:\CMP\LOS Monitoring 2021\CMP_plus_shp', 'cmp_segments_plus.shp'))
 
 # Get CMP and INRIX correspondence table
 conflation = pd.read_csv(os.path.join(NETCONF_DIR, CORR_FILE))
@@ -40,7 +40,7 @@ for p in INPUT_PATHS:
         df_cmp = dd.concat([df_cmp,df1],axis=0,interleave_partitions=True)
         
 #Read in the raw floating car run dataframe
-FCR_DIR = r'Z:\SF_CMP\CMP2021\SFCTA 2021 TTR DATA'
+FCR_DIR = r'Q:\CMP\LOS Monitoring 2021\Auto_LOS\FCR\SFCTA 2021 TTR DATA'
 FCR_Files = os.listdir(FCR_DIR)
 
 fcr = pd.DataFrame()
