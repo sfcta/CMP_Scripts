@@ -62,12 +62,12 @@ fcr['traveltime'] = fcr.apply(lambda x: (x['exit_time']-x['enter_time']).total_s
 fcr['cmp_segid'] = fcr['cmp_segid'].astype(int)
 
 fcr = pd.merge(fcr, cmp_segs[['cmp_segid', 'length']], on='cmp_segid', how='left')
+fcr['speed'] = round(3600*fcr['length']/fcr['traveltime'], 3)
 fcr_avg_spds = fcr.groupby(['cmp_segid', 'period']).agg({'speed': ['mean', 'std', 'min', 'max', 'count']}).reset_index()
 fcr_avg_spds.columns = ['cmp_segid', 'period', 'avg_speed', 'std_speed', 'min_speed', 'max_speed', 'sample_size']
 
 #Save the floating run average speed
 fcr_avg_spds.to_csv(FCR_DIR + '\floating_car_average_speeds.csv', index=False)
-fcr['speed'] = round(3600*fcr['length']/fcr['traveltime'], 3)
 
 
 # Calculate reference speed for CMP segments
