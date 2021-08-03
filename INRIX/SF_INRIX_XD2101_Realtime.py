@@ -53,8 +53,8 @@ OUT_FILE = 'Jun2021_AutoSpeeds_2.csv'
 INPUT_PATHS = [['All_SF_2021-06-06_to_2021-06-13_1_min_part_', 4]]
 
 # Sample size thresholds
-ss_threshold_peaks = 180 # Minimum sample size for the AM/PM monitoring period
-ss_threshold_hourly = 30 # Miniumum sample size for hourly
+ss_threshold_peaks = 10 # Minimum sample size for the AM/PM monitoring period
+ss_threshold_hourly = 10 # Miniumum sample size for hourly
 
 # Input CMP segment shapefile
 cmp_segs=gp.read_file(os.path.join(r'Q:\CMP\LOS Monitoring 2021\CMP_plus_shp', 'cmp_segments_plus.shp'))
