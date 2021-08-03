@@ -262,8 +262,8 @@ def cmp_seg_level_speed_and_los(df_cmp_period, ss_threshold, cur_year, cur_perio
     cmp_period['Speed'] = cmp_period['Length_Matched']/cmp_period['TT']
     cmp_period['SpatialCov'] = 100*cmp_period['Length_Matched']/cmp_period['CMP_Length']  #Spatial coverage 
     
-    group_cols = ['CMP_SegID']
-    rename_cols = ['cmp_segid', 'sample_size', 'TT', 'Len', 'std_speed', 'pcnt5th', 'pcnt20th']
+    group_cols = ['CMP_SegID','Date']
+    rename_cols = ['cmp_segid', 'date', 'sample_size', 'TT', 'Len', 'std_speed', 'pcnt5th', 'pcnt20th']
     cmp_period_agg = pd.DataFrame(columns = rename_cols)
     
     # 99% spatial coverage 
@@ -296,7 +296,7 @@ def cmp_seg_level_speed_and_los(df_cmp_period, ss_threshold, cur_year, cur_perio
     cmp_period_agg['los_hcm85'] = cmp_period_agg.apply(lambda x: los_1985(x.cls_hcm85, x.avg_speed), axis=1)
     cmp_period_agg['los_hcm00'] = cmp_period_agg.apply(lambda x: los_2000(x.cls_hcm00, x.avg_speed), axis=1)
 
-    cmp_period_agg = cmp_period_agg[['cmp_segid', 'year', 'period', 'avg_speed', 'los_hcm85', 'los_hcm00', 'std_speed', 'pcnt5th', 'pcnt20th', 'cov', 'sample_size', 'comment']]
+    cmp_period_agg = cmp_period_agg[['cmp_segid', 'year', 'date', 'period', 'avg_speed', 'los_hcm85', 'los_hcm00', 'std_speed', 'pcnt5th', 'pcnt20th', 'cov', 'sample_size', 'comment']]
     
     return cmp_period_agg
 
