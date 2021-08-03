@@ -289,7 +289,6 @@ def cmp_seg_level_speed_and_los(df_cmp_period, ss_threshold, cur_year, cur_perio
 
     cmp_period_agg['year'] = cur_year
     cmp_period_agg['period'] = cur_period
-    cmp_period_agg['source']='INRIX'
     
     cmp_period_agg['cmp_segid'] = cmp_period_agg['cmp_segid'].astype('int64') # MAX ADDED (Cast to int for merging)
 
@@ -297,7 +296,7 @@ def cmp_seg_level_speed_and_los(df_cmp_period, ss_threshold, cur_year, cur_perio
     cmp_period_agg['los_hcm85'] = cmp_period_agg.apply(lambda x: los_1985(x.cls_hcm85, x.avg_speed), axis=1)
     cmp_period_agg['los_hcm00'] = cmp_period_agg.apply(lambda x: los_2000(x.cls_hcm00, x.avg_speed), axis=1)
 
-    cmp_period_agg = cmp_period_agg[['cmp_segid', 'year', 'source', 'period', 'avg_speed', 'los_hcm85', 'los_hcm00', 'std_speed', 'pcnt5th', 'pcnt20th', 'cov', 'sample_size', 'comment']]
+    cmp_period_agg = cmp_period_agg[['cmp_segid', 'year', 'period', 'avg_speed', 'los_hcm85', 'los_hcm00', 'std_speed', 'pcnt5th', 'pcnt20th', 'cov', 'sample_size', 'comment']]
     
     return cmp_period_agg
 
