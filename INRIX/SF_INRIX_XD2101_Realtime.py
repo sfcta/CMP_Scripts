@@ -66,16 +66,15 @@ conf_len=conflation.groupby('CMP_SegID').Length_Matched.sum().reset_index()
 conf_len.columns = ['CMP_SegID', 'CMP_Length']
 
 # Read in the INRIX data using dask to save memory
-with ProgressBar(): 
-    df_cmp = pd.DataFrame()
-    for p in INPUT_PATHS:
-        for i in range(1,p[1]):
-            print(f'Reading path {i}')
-            df1 = dd.read_csv(os.path.join(DATA_DIR, '%s%s\data.csv' %(p[0],i)), assume_missing=True)
-            if len(df1)>0:
-                df1['Segment ID'] = df1['Segment ID'].astype('int')
-                df1 = df1[df1['Segment ID'].isin(conflation['INRIX_SegID'])]
-                df_cmp = dd.concat([df_cmp,df1],axis=0,interleave_partitions=True)
+df_cmp = pd.DataFrame()
+for p in INPUT_PATHS:
+    for i in range(1,p[1]):
+        print(f'Reading path {i}')
+        df1 = dd.read_csv(os.path.join(DATA_DIR, '%s%s\data.csv' %(p[0],i)), assume_missing=True)
+        if len(df1)>0:
+            df1['Segment ID'] = df1['Segment ID'].astype('int')
+            df1 = df1[df1['Segment ID'].isin(conflation['INRIX_SegID'])]
+            df_cmp = dd.concat([df_cmp,df1],axis=0,interleave_partitions=True)
 
 df_cmp['Segment ID'] = df_cmp['Segment ID'].astype('int')
 
@@ -299,32 +298,31 @@ def cmp_seg_level_speed_and_los(df_cmp_period, ss_threshold, cur_year, cur_perio
     
     return cmp_period_agg
 
-with ProgressBar():
-    
-    print('Processing hourly & AM/PM periods...')
-    
-    cmp_segs_los = pd.DataFrame()
-    
-    # Hourly
-    for hour in range(24):
-        print(f'Hour = {hour}')
-        subset = df_cmp[(df_cmp['Hour']==hour)]
-        tmp = cmp_seg_level_speed_and_los(subset, ss_threshold_hourly, cur_year=2021, cur_period=hour)
-        cmp_segs_los = cmp_segs_los.append(tmp, ignore_index=True)
-    
-    # AM (7-9am)
-    print('AM Period')
-    subset = df_cmp[(df_cmp['Hour']==7) | (df_cmp['Hour']==8)]
-    tmp = cmp_seg_level_speed_and_los(subset, ss_threshold_peaks, cur_year=2021, cur_period='AM')
+  
+print('Processing hourly & AM/PM periods...')
+
+cmp_segs_los = pd.DataFrame()
+
+# Hourly
+for hour in range(24):
+    print(f'Hour = {hour}')
+    subset = df_cmp[(df_cmp['Hour']==hour)]
+    tmp = cmp_seg_level_speed_and_los(subset, ss_threshold_hourly, cur_year=2021, cur_period=hour)
     cmp_segs_los = cmp_segs_los.append(tmp, ignore_index=True)
-    
-    # PM (4:30-6:30pm)
-    print('PM Period')
-    subset = df_cmp[((df_cmp['Hour']==16) & (df_cmp['Minute']>=30)) | (df_cmp['Hour']==17) | ((df_cmp['Hour']==18) & (df_cmp['Minute']<30))]
-    tmp = cmp_seg_level_speed_and_los(subset, ss_threshold_peaks, cur_year=2021, cur_period='PM')
-    cmp_segs_los = cmp_segs_los.append(tmp, ignore_index=True)
-    
-    print('Finished processing periods.')
+
+# AM (7-9am)
+print('AM Period')
+subset = df_cmp[(df_cmp['Hour']==7) | (df_cmp['Hour']==8)]
+tmp = cmp_seg_level_speed_and_los(subset, ss_threshold_peaks, cur_year=2021, cur_period='AM')
+cmp_segs_los = cmp_segs_los.append(tmp, ignore_index=True)
+
+# PM (4:30-6:30pm)
+print('PM Period')
+subset = df_cmp[((df_cmp['Hour']==16) & (df_cmp['Minute']>=30)) | (df_cmp['Hour']==17) | ((df_cmp['Hour']==18) & (df_cmp['Minute']<30))]
+tmp = cmp_seg_level_speed_and_los(subset, ss_threshold_peaks, cur_year=2021, cur_period='PM')
+cmp_segs_los = cmp_segs_los.append(tmp, ignore_index=True)
+
+print('Finished processing periods.')
 
 # Calculate reliability metrics
 cmp_segs_los = pd.merge(cmp_segs_los, cmp_segs_refspd[['cmp_segid', 'refspd_inrix']], on='cmp_segid', how='left')
