@@ -104,6 +104,9 @@ df_cmp = df_cmp[df_cmp['Speed(miles/hour)']>0]
 # Get inrix_segid : cmp_segid mapping
 df_cmp = df_cmp.merge(conflation, left_on='Segment ID', right_on='INRIX_SegID', how='outer')
 
+# convert to pandas dataframe for speed
+df_cmp = df_cmp.compute()
+
 # Define processing functions
 # LOS function using 1985 HCM
 def los_1985(cls, spd):
@@ -253,7 +256,7 @@ def cmp_seg_level_speed_and_los(df_cmp_period, ss_threshold, cur_year, cur_perio
 
     # Get total travel time at a particular date_time on a CMP segment
     cmp_period = df_cmp_period.groupby(['CMP_SegID', 'Date','Date_Time']).agg({'Length_Matched': 'sum',
-                                                               'TT': 'sum'}).reset_index().compute()
+                                                               'TT': 'sum'}).reset_index()
 
     cmp_period = pd.merge(cmp_period, conf_len, on='CMP_SegID', how='left')
     cmp_period['Speed'] = cmp_period['Length_Matched']/cmp_period['TT']
