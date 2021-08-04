@@ -9,11 +9,11 @@ warnings.filterwarnings("ignore")
 
 # SFCTA Paths
 NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2021\Network_Conflation'
-CORR_FILE = r'Q:\CMP\LOS Monitoring 2021\Network_Conflation\CMP_Segment_INRIX_Links_Correspondence_2101_Manual_PLUS_ExpandedNetwork.csv'
+CORR_FILE = r'CMP_Segment_INRIX_Links_Correspondence_2101_Manual_PLUS_ExpandedNetwork.csv'
 
 DATA_DIR = r'Q:\Data\Observed\Streets\INRIX\v2101'
 
-OUT_DIR = r'Q:\CMP\LOS Monitoring 2020\Auto_LOS'
+OUT_DIR = r'Q:\CMP\Congestion_Tracker\viz_data'
 
 # OUT_FILE = 'Mar2021_AutoSpeeds_4.csv'
 # INPUT_PATHS = [['All_SF_2021-03-21_to_2021-03-28_1_min_part_', 4]]
@@ -48,7 +48,7 @@ OUT_DIR = r'Q:\CMP\LOS Monitoring 2020\Auto_LOS'
 # OUT_FILE = 'Jun2021_AutoSpeeds_1.csv'
 # INPUT_PATHS = [['All_SF_2021-05-30_to_2021-06-06_1_min_part_', 4]]
 
-OUT_FILE = 'Jun2021_AutoSpeeds_2.csv'
+OUT_FILE = ['Jun2021_AutoSpeeds', '2']
 INPUT_PATHS = [['All_SF_2021-06-06_to_2021-06-13_1_min_part_', 4]]
 
 # Sample size thresholds
@@ -335,5 +335,5 @@ cmp_segs_los['bi'] = np.maximum(0, cmp_segs_los['avg_speed']/cmp_segs_los['pcnt5
 peaks = cmp_segs_los[cmp_segs_los['period'].isin(['AM','PM'])]
 hourly = cmp_segs_los[~cmp_segs_los['period'].isin(['AM','PM'])]
 hourly.rename(columns={'period':'hour'}, inplace=True)
-hourly.to_csv(os.path.join(OUT_DIR, OUT_FILE.split('.')[0] + '_Hourly.csv' ), index=False)
-peaks.to_csv(os.path.join(OUT_DIR, OUT_FILE.split('.')[0] + '_AMPM.csv' ), index=False)
+hourly.to_csv(os.path.join(OUT_DIR, OUT_FILE[0] + '_Hourly_' + OUT_FILE[1] + '.csv' ), index=False)
+peaks.to_csv(os.path.join(OUT_DIR, OUT_FILE[0] + '_AMPM_'+ OUT_FILE[1] + '.csv' ), index=False)
