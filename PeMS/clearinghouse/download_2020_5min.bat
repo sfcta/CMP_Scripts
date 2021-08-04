@@ -1,0 +1,1 @@
+python clearinghouse_downloader.py config_clearinghouse_2020_5min.ini
