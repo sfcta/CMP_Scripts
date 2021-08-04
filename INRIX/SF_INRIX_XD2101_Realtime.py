@@ -5,7 +5,6 @@ import geopandas as gp
 import dask.dataframe as dd
 import os
 import warnings
-from dask.diagnostics import ProgressBar
 warnings.filterwarnings("ignore")
 
 # SFCTA Paths
@@ -57,7 +56,7 @@ ss_threshold_peaks = 10 # Minimum sample size for the AM/PM monitoring period
 ss_threshold_hourly = 10 # Miniumum sample size for hourly
 
 # Input CMP segment shapefile
-cmp_segs=gp.read_file(os.path.join(r'Q:\CMP\LOS Monitoring 2021\CMP_plus_shp', 'cmp_segments_plus.shp'))
+cmp_segs=gp.read_file(os.path.join(r'Q:\CMP\LOS Monitoring 2021\CMP_plus_shp\viz_export', 'cmp_segments_plus_v2101.shp'))
 
 # Get CMP and INRIX correspondence table
 conflation = pd.read_csv(os.path.join(NETCONF_DIR, CORR_FILE))
