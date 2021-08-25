@@ -313,7 +313,8 @@ def cmp_seg_level_speed_and_los(df_cmp_period, ss_threshold, r_spatial_thrd, flo
     cmp_period_combine = pd.merge(cmp_period_combine, cmp_segs[['cmp_segid', 'cls_hcm85', 'cls_hcm00']], on='cmp_segid', how='left')
     cmp_period_combine['los_hcm85'] = cmp_period_combine.apply(lambda x: los_1985(x.cls_hcm85, x.avg_speed), axis=1)
     cmp_period_combine['los_hcm00'] = cmp_period_combine.apply(lambda x: los_2000(x.cls_hcm00, x.avg_speed), axis=1)
-
+    
+    cmp_period_combine = cmp_period_combine.merge(cmp_period_r, on='cmp_segid', how='left')
     cmp_period_combine = cmp_period_combine[['cmp_segid', 'year', 'source', 'period', 'avg_speed', 'los_hcm85', 'los_hcm00', 'sample_size_los', 'comment', 'std_speed', 'cov', 'pcnt5th', 'pcnt20th', 'pcnt50th', 'sample_size_rel']]
     
     return cmp_period_combine
