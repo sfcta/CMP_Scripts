@@ -19,6 +19,9 @@ stops = gp.read_file(os.path.join(APC_DIR, 'GTFS_stops.shp')
 # Read in transit APC data
 apc = pd.read_csv(os.path.join(APC_DIR, 'APC_STOP_BOARDINGS_FACTS_SFCTACMP2021.csv')
 
+# Read in the list of stop pairs manually identified that are patially overlap with cmp segments
+overlap_pairs = pd.read_csv(os.path.join(APC_DIR, 'Postprocessing_overlapping_transit_segments.csv'))
+                  
 apc_notnull = apc[pd.notnull(apc['CLOSE_DATE_TIME'])]
 print('Percent of records with null value: ', round(100 - 100*(len(apc_notnull)/len(apc)),2))
 
@@ -364,12 +367,65 @@ apc_pairs_pm['cur_next_loc_dis'] = np.where(apc_pairs_pm['cmp_segid']==175,
                                             apc_pairs_pm['next_stop_loc'])
 
 # # Transit Speeds on CMP Segment 
-def match_intermediate_apc_stops(apc_pairs, apc_cmp, cmp_segs_prj, timep):
+def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj, timep):
     # ### Auto Matched Pairs 
     apc_pairs['cmp_segid'] = apc_pairs['cmp_segid'].astype(int)
     apc_pairs['cur_stop_id'] = apc_pairs['cur_stop_id'].astype(int)
     apc_pairs['next_stop_id'] = apc_pairs['next_stop_id'].astype(int)
     
+    # ### Manually Matched Pairs 
+    pair_cnt = len(apc_pairs)
+    for cur_stop_idx in range(len(overlap_pairs)):
+        cur_stopid = overlap_pairs.loc[cur_stop_idx, 'pre_stopid']
+        next_stopid = overlap_pairs.loc[cur_stop_idx, 'next_stopid']
+        cur_stop_trips = apc_cmp.index[apc_cmp['BS_ID']==cur_stopid].tolist()
+        for cur_stop_trip_idx in cur_stop_trips:
+            if apc_cmp.loc[cur_stop_trip_idx + 1, 'BS_ID'] == next_stopid:
+    
+                cur_stop_trip_id = apc_cmp.loc[cur_stop_trip_idx, 'TRIP_ID_EXTERNAL']
+                cur_stop_date = apc_cmp.loc[cur_stop_trip_idx, 'Date']
+                cur_stop_veh_id = apc_cmp.loc[cur_stop_trip_idx, 'VEHICLE_ID']
+                cur_stop_open_time = apc_cmp.loc[cur_stop_trip_idx, 'Open_Time']
+                cur_stop_close_time = apc_cmp.loc[cur_stop_trip_idx, 'Close_Time']
+                cur_stop_dwell_time = apc_cmp.loc[cur_stop_trip_idx, 'DWELL_TIME']
+    
+                next_stop_trip_id = apc_cmp.loc[cur_stop_trip_idx + 1, 'TRIP_ID_EXTERNAL']
+                next_stop_date = apc_cmp.loc[cur_stop_trip_idx + 1, 'Date']
+                next_stop_veh_id = apc_cmp.loc[cur_stop_trip_idx + 1, 'VEHICLE_ID']
+                next_stop_open_time = apc_cmp.loc[cur_stop_trip_idx + 1, 'Open_Time']
+                next_stop_close_time = apc_cmp.loc[cur_stop_trip_idx + 1, 'Close_Time']
+                next_stop_dwell_time = apc_cmp.loc[cur_stop_trip_idx + 1, 'DWELL_TIME']
+    
+                # Check if two stops share the same trip id, date, and vehicle id
+                if (cur_stop_trip_id == next_stop_trip_id) & (cur_stop_date == next_stop_date) & (cur_stop_veh_id == next_stop_veh_id):
+                    cur_next_traveltime = (next_stop_open_time-cur_stop_open_time).total_seconds()
+                    cur_next_loc_dis = overlap_pairs.loc[cur_stop_idx, 'cmp_overlap_len']/5280/overlap_pairs.loc[cur_stop_idx, 'cmp_overlap_ratio']
+                    
+                    # Remove records deemed erroneous according to memo from last cycle
+                    if (cur_next_loc_dis>0) & (cur_next_traveltime>0):
+                        if 3600 * cur_next_loc_dis/cur_next_traveltime<=55:
+                            # Add matched stop pairs to the dataframe for subsequent speed calculation
+                            apc_pairs.loc[pair_cnt, 'cmp_segid'] = overlap_pairs.loc[cur_stop_idx, 'cmp_segid']
+                            apc_pairs.loc[pair_cnt, 'trip_id'] = cur_stop_trip_id
+                            apc_pairs.loc[pair_cnt, 'trip_date'] = cur_stop_date
+                            apc_pairs.loc[pair_cnt, 'vehicle_id'] = cur_stop_veh_id
+    
+                            apc_pairs.loc[pair_cnt, 'cur_stop_id'] = cur_stopid
+                            apc_pairs.loc[pair_cnt, 'cur_stop_open_time'] = cur_stop_open_time
+                            apc_pairs.loc[pair_cnt, 'cur_stop_close_time'] = cur_stop_close_time
+                            apc_pairs.loc[pair_cnt, 'cur_stop_dwell_time'] = cur_stop_dwell_time
+    
+                            apc_pairs.loc[pair_cnt, 'next_stop_id'] = next_stopid
+                            apc_pairs.loc[pair_cnt, 'next_stop_open_time'] = next_stop_open_time
+                            apc_pairs.loc[pair_cnt, 'next_stop_close_time'] = next_stop_close_time
+                            apc_pairs.loc[pair_cnt, 'next_stop_dwell_time'] = next_stop_dwell_time
+                            
+                            apc_pairs.loc[pair_cnt, 'cur_next_time'] = cur_next_traveltime
+                            apc_pairs.loc[pair_cnt, 'cur_next_loc_dis'] = cur_next_loc_dis
+                            apc_pairs.loc[pair_cnt, 'cur_next_rev_dis'] = apc_cmp.loc[cur_stop_trip_idx, 'REV_DISTANCE']
+    
+                        pair_cnt = pair_cnt + 1
+                  
     apc_pairs['cur_next_loc_dis'] = np.where(apc_pairs['cur_next_loc_dis'] >= apc_pairs['cur_next_rev_dis'], 
                                             apc_pairs['cur_next_loc_dis'],
                                             apc_pairs['cur_next_rev_dis'])
@@ -401,10 +457,10 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, cmp_segs_prj, timep):
     return apc_cmp_speeds
     
 # ## AM 
-apc_cmp_speeds_am = match_intermediate_apc_stops(apc_pairs_am, apc_cmp_am, cmp_segs_prj, 'AM')
+apc_cmp_speeds_am = match_intermediate_apc_stops(apc_pairs_am, apc_cmp_am, overlap_pairs, cmp_segs_prj, 'AM')
 
 # ## PM 
-apc_cmp_speeds_pm = match_intermediate_apc_stops(apc_pairs_pm, apc_cmp_pm, cmp_segs_prj, 'PM')
+apc_cmp_speeds_pm = match_intermediate_apc_stops(apc_pairs_pm, apc_cmp_pm, overlap_pairs, cmp_segs_prj, 'PM')
 
 # ## Combine AM and PM 
 apc_cmp_speeds = apc_cmp_speeds_am.append(apc_cmp_speeds_pm, ignore_index=True)
