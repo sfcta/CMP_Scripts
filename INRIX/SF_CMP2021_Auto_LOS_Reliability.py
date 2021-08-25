@@ -70,7 +70,7 @@ fcr_avg_spds = fcr.groupby(['cmp_segid', 'period']).agg({'speed': ['mean', 'std'
 fcr_avg_spds.columns = ['cmp_segid', 'period', 'avg_speed', 'std_speed', 'min_speed', 'max_speed', 'sample_size_los']
 
 #Save the floating run average speed
-fcr_avg_spds.to_csv(FCR_DIR + '\floating_car_average_speeds.csv', index=False)
+fcr_avg_spds.to_csv(FCR_DIR + '/floating_car_average_speeds.csv', index=False)
 
 
 # Calculate reference speed for CMP segments
@@ -245,7 +245,7 @@ def spatial_coverage(df, cmp_period_agg, group_cols, rename_cols, coverage_thres
     cmp_tt_agg.columns = rename_cols
     cmp_tt_agg['avg_speed'] = round(cmp_tt_agg['Len']/cmp_tt_agg['TT'],3)
     cmp_tt_agg['cov'] = round(100*cmp_tt_agg['std_speed']/cmp_tt_agg['avg_speed'],3)
-    cmp_tt_agg = cmp_tt_agg[cmp_tt_agg['sample_size']>=ss_threshold]
+    cmp_tt_agg = cmp_tt_agg[cmp_tt_agg['sample_size_los']>=ss_threshold]
     
     if len(cmp_tt_agg)>0:
         cmp_tt_agg['comment'] = 'LOS calculation performed on ' + str(coverage_threshold) +'% or greater of length'
