@@ -7,11 +7,12 @@ warnings.filterwarnings("ignore")
 import os
 
 # UK Paths
-APC_DIR = r'C:\Users\xzh263\Dropbox (KTC)\SFCTA CMP\2021 CMP\APC'
+APC_DIR = r'Q:\Data\Observed\Transit\Muni\APC\CMP_2021'
 
-CMPplus_DIR = r'Z:\SF_CMP\CMP2021\CMP_plus_shp'
-INRIX_DIR = r'Z:\SF_CMP\CMP2021\Inrix_XD_2101_SF_manualedit'  # Add INRIX street names to be more comprehensive
-NETCONF_DIR = r'Z:\SF_CMP\CMP2021'
+CMPplus_DIR = r'Q:\CMP\LOS Monitoring 2021\CMP_plus_shp\old_cmp_plus'
+INRIX_DIR = r'Q:\GIS\Transportation\Roads\INRIX\XD\21_01\maprelease-shapefiles\SF'  # Add INRIX street names to be more comprehensive
+NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2021\Network_Conflation'
+OUT_DIR = r'Q:\CMP\LOS Monitoring 2021\Transit\Speed'
 
 # Read in transit stop file downloaded from GTFS
 stops = gp.read_file(os.path.join(APC_DIR, 'GTFS_stops.shp'))
@@ -82,7 +83,7 @@ for stop_id in stop_list:
 stop_vol_complete = pd.merge(stop_vol_complete, vol_daytype_avg_stops, on=['stopid', 'daytype', 'epoch'], how='left')
 
 # Save volume output file
-stop_vol_complete.to_csv(os.path.join(APC_DIR, 'CMP2021_APC_Transit_Volume.csv'), index=False)
+stop_vol_complete.to_csv(os.path.join(OUT_DIR, 'CMP2021_APC_Transit_Volume.csv'), index=False)
 
 
 # ------------------------------ 2. Calculate transit speed and reliability ------------------------------
@@ -423,7 +424,7 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj
     apc_trip_speeds = pd.merge(apc_trip_speeds, cmp_segs_prj[['cmp_segid', 'length']], on='cmp_segid', how='left')
     apc_trip_speeds['len_ratio'] = 100*apc_trip_speeds['trip_stop_distance']/apc_trip_speeds['length']
     
-    #apc_trip_speeds.to_csv(os.path.join(APC_DIR, 'CMP2021_APC_Matched_Trips_%s.csv' %timep), index=False)
+    #apc_trip_speeds.to_csv(os.path.join(OUT_DIR, 'CMP2021_APC_Matched_Trips_%s.csv' %timep), index=False)
     
     # Only include trips covering at least 50% of CMP length
     apc_trip_speeds_over50 = apc_trip_speeds[apc_trip_speeds['len_ratio']>=50]
@@ -451,4 +452,4 @@ apc_cmp_speeds = apc_cmp_speeds[apc_cmp_speeds['sample_size']>=9]
 print('Number of segment-periods ', len(apc_cmp_speeds))
 
 out_cols = ['cmp_segid', 'year', 'source', 'period', 'avg_speed', 'std_dev', 'cov', 'sample_size']
-apc_cmp_speeds[out_cols].to_csv(os.path.join(APC_DIR, 'CMP2021_APC_Transit_Speeds.csv'), index=False)
+apc_cmp_speeds[out_cols].to_csv(os.path.join(OUT_DIR, 'CMP2021_APC_Transit_Speeds.csv'), index=False)
