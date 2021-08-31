@@ -14,10 +14,10 @@ INRIX_DIR = r'Z:\SF_CMP\CMP2021\Inrix_XD_2101_SF_manualedit'  # Add INRIX street
 NETCONF_DIR = r'Z:\SF_CMP\CMP2021'
 
 # Read in transit stop file downloaded from GTFS
-stops = gp.read_file(os.path.join(APC_DIR, 'GTFS_stops.shp')
+stops = gp.read_file(os.path.join(APC_DIR, 'GTFS_stops.shp'))
 
 # Read in transit APC data
-apc = pd.read_csv(os.path.join(APC_DIR, 'APC_STOP_BOARDINGS_FACTS_SFCTACMP2021.csv')
+apc = pd.read_csv(os.path.join(APC_DIR, 'APC_STOP_BOARDINGS_FACTS_SFCTACMP2021.csv'))
 
 # Read in the list of stop pairs manually identified that are patially overlap with cmp segments
 overlap_pairs = pd.read_csv(os.path.join(APC_DIR, 'Postprocessing_overlapping_transit_segments.csv'))
