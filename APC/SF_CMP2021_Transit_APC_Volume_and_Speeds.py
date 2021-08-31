@@ -332,7 +332,7 @@ def match_stop_pairs_to_cmp(apc_cmp_df, stops_near_cmp_list, cmp_segs_near, cmp_
     return apc_pairs_df
     
 # ## AM 
-apc_cmp_am = apc_cmp[(apc_cmp['Open_Hour']<9) & (apc_cmp['Close_Hour']>6)]
+apc_cmp_am = apc_cmp[(apc_cmp['Close_Period']=='AM') & (apc_cmp['Open_Hour']<9) & (apc_cmp['Close_Hour']>6)]
 apc_cmp_am = apc_cmp_am.merge(stops, left_on='BS_ID', right_on='stop_id', how='left')
 apc_cmp_am = apc_cmp_am.sort_values(by=['TRIP_ID_EXTERNAL', 'Date', 'VEHICLE_ID', 'Open_Time']).reset_index()
 
