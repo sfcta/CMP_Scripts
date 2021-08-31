@@ -312,33 +312,32 @@ def match_stop_pairs_to_cmp(apc_cmp_df, stops_near_cmp_list, cmp_segs_near, cmp_
 
         if cur_stop_idx % 50000 == 0:
             print('Processed %s percent' % round(100*cur_stop_idx/len(apc_cmp_df), 2))
+        
+    # Update the stop location for CMP 175 due to its irregular geometry
+    apc_pairs_df['cur_stop_loc'] = np.where(apc_pairs_df['cmp_segid']==175,
+                                         np.where(apc_pairs_df['cur_stop_id']==5543, 173.935,
+                                                 np.where(apc_pairs_df['cur_stop_id']==5545, 1020.629,
+                                                         np.where(apc_pairs_df['cur_stop_id']==5836, 1804.72,
+                                                                 np.where(apc_pairs_df['cur_stop_id']==5835, 2685.807, apc_pairs_df['cur_stop_loc'])))),
+                                          apc_pairs_df['cur_stop_loc'])
+    apc_pairs_df['next_stop_loc'] = np.where(apc_pairs_df['cmp_segid']==175,
+                                         np.where(apc_pairs_df['next_stop_id']==5543, 173.935,
+                                                 np.where(apc_pairs_df['next_stop_id']==5545, 1020.629,
+                                                         np.where(apc_pairs_df['next_stop_id']==5836, 1804.72,
+                                                                 np.where(apc_pairs_df['next_stop_id']==5835, 2685.807, apc_pairs_df['next_stop_loc'])))),
+                                          apc_pairs_df['next_stop_loc'])
+    apc_pairs_df['cur_next_loc_dis'] = np.where(apc_pairs_df['cmp_segid']==175,
+                                         abs(apc_pairs_df['next_stop_loc'] - apc_pairs_df['cur_stop_loc']) / 5280,
+                                          apc_pairs_df['cur_next_loc_dis'])
     return apc_pairs_df
     
 # ## AM 
 apc_cmp_am = apc_cmp[(apc_cmp['Open_Hour']<9) & (apc_cmp['Close_Hour']>6)]
-
 apc_cmp_am = apc_cmp_am.merge(stops, left_on='BS_ID', right_on='stop_id', how='left')
 apc_cmp_am = apc_cmp_am.sort_values(by=['TRIP_ID_EXTERNAL', 'Date', 'VEHICLE_ID', 'Open_Time']).reset_index()
 
 print('------------Start processing AM trips------------')
 apc_pairs_am = match_stop_pairs_to_cmp(apc_cmp_am, stops_near_cmp_list, cmp_segs_near, cmp_segs_prj, angle_thrd)
-
-# Update the stop location for CMP 175 due to its irregular geometry
-apc_pairs_am['cur_stop_loc'] = np.where(apc_pairs_am['cmp_segid']==175,
-                                     np.where(apc_pairs_am['cur_stop_id']==5543, 173.935,
-                                             np.where(apc_pairs_am['cur_stop_id']==5545, 1020.629,
-                                                     np.where(apc_pairs_am['cur_stop_id']==5836, 1804.72,
-                                                             np.where(apc_pairs_am['cur_stop_id']==5835, 2685.807, apc_pairs_am['cur_stop_loc'])))),
-                                      apc_pairs_am['cur_stop_loc'])
-apc_pairs_am['next_stop_loc'] = np.where(apc_pairs_am['cmp_segid']==175,
-                                     np.where(apc_pairs_am['next_stop_id']==5543, 173.935,
-                                             np.where(apc_pairs_am['next_stop_id']==5545, 1020.629,
-                                                     np.where(apc_pairs_am['next_stop_id']==5836, 1804.72,
-                                                             np.where(apc_pairs_am['next_stop_id']==5835, 2685.807, apc_pairs_am['next_stop_loc'])))),
-                                      apc_pairs_am['next_stop_loc'])
-apc_pairs_am['cur_next_loc_dis'] = np.where(apc_pairs_am['cmp_segid']==175,
-                                     abs(apc_pairs_am['next_stop_loc'] - apc_pairs_am['cur_stop_loc']) / 5280,
-                                      apc_pairs_am['next_stop_loc'])
                                       
 # ## PM 
 apc_cmp_pm = apc_cmp[(apc_cmp['Close_Period']=='PM') & ((apc_cmp['Open_Time_float']<=6.5) & (apc_cmp['Close_Time_float']>=4.5))]
@@ -349,22 +348,6 @@ apc_cmp_pm = apc_cmp_pm.sort_values(by=['TRIP_ID_EXTERNAL', 'Date', 'VEHICLE_ID'
 print('------------Start processing PM trips------------')
 apc_pairs_pm = match_stop_pairs_to_cmp(apc_cmp_pm, stops_near_cmp_list, cmp_segs_near, cmp_segs_prj, angle_thrd)
 
-# Update the stop location for CMP 175 due to its irregular geometry
-apc_pairs_pm['cur_stop_loc'] = np.where(apc_pairs_pm['cmp_segid']==175,
-                                     np.where(apc_pairs_pm['cur_stop_id']==5543, 173.935,
-                                             np.where(apc_pairs_pm['cur_stop_id']==5545, 1020.629,
-                                                     np.where(apc_pairs_pm['cur_stop_id']==5836, 1804.72,
-                                                             np.where(apc_pairs_pm['cur_stop_id']==5835, 2685.807, apc_pairs_pm['cur_stop_loc'])))),
-                                      apc_pairs_pm['cur_stop_loc'])
-apc_pairs_pm['next_stop_loc'] = np.where(apc_pairs_pm['cmp_segid']==175,
-                                     np.where(apc_pairs_pm['next_stop_id']==5543, 173.935,
-                                             np.where(apc_pairs_pm['next_stop_id']==5545, 1020.629,
-                                                     np.where(apc_pairs_pm['next_stop_id']==5836, 1804.72,
-                                                             np.where(apc_pairs_pm['next_stop_id']==5835, 2685.807, apc_pairs_pm['next_stop_loc'])))),
-                                      apc_pairs_pm['next_stop_loc'])
-apc_pairs_pm['cur_next_loc_dis'] = np.where(apc_pairs_pm['cmp_segid']==175,
-                                            abs(apc_pairs_pm['next_stop_loc'] - apc_pairs_pm['cur_stop_loc']) / 5280,
-                                            apc_pairs_pm['next_stop_loc'])
 
 # # Transit Speeds on CMP Segment 
 def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj, timep):
