@@ -222,6 +222,8 @@ def match_stop_pairs_to_cmp(apc_cmp_df, stops_near_cmp_list, cmp_segs_near, cmp_
                 cur_stop_trip_id = apc_cmp_df.loc[cur_stop_idx, 'TRIP_ID_EXTERNAL']
                 cur_stop_date = apc_cmp_df.loc[cur_stop_idx, 'Date']
                 cur_stop_veh_id = apc_cmp_df.loc[cur_stop_idx, 'VEHICLE_ID']
+                cur_stop_route_alpha = apc_cmp_df.loc[cur_stop_idx, 'ROUTE_ALPHA']
+                cur_stop_route_dir = apc_cmp_df.loc[cur_stop_idx, 'DIRECTION']
 
                 # Succeeding candidate stop in the dataframe
                 next_stop_trip_id = apc_cmp_df.loc[next_stop_idx, 'TRIP_ID_EXTERNAL']
@@ -289,6 +291,8 @@ def match_stop_pairs_to_cmp(apc_cmp_df, stops_near_cmp_list, cmp_segs_near, cmp_
                                         apc_pairs_df.loc[pair_cnt, 'trip_id'] = cur_stop_trip_id
                                         apc_pairs_df.loc[pair_cnt, 'trip_date'] = cur_stop_date
                                         apc_pairs_df.loc[pair_cnt, 'vehicle_id'] = cur_stop_veh_id
+                                        apc_pairs_df.loc[pair_cnt, 'route_alpha'] = cur_stop_route_alpha
+                                        apc_pairs_df.loc[pair_cnt, 'direction'] = cur_stop_route_dir
 
                                         apc_pairs_df.loc[pair_cnt, 'cur_stop_id'] = cur_stop_id
                                         apc_pairs_df.loc[pair_cnt, 'cur_stop_open_time'] = cur_stop_open_time
@@ -369,6 +373,8 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj
                 cur_stop_trip_id = apc_cmp.loc[cur_stop_trip_idx, 'TRIP_ID_EXTERNAL']
                 cur_stop_date = apc_cmp.loc[cur_stop_trip_idx, 'Date']
                 cur_stop_veh_id = apc_cmp.loc[cur_stop_trip_idx, 'VEHICLE_ID']
+                cur_stop_route_alpha = apc_cmp.loc[cur_stop_trip_idx, 'ROUTE_ALPHA']
+                cur_stop_route_dir = apc_cmp.loc[cur_stop_trip_idx, 'DIRECTION']
                 cur_stop_open_time = apc_cmp.loc[cur_stop_trip_idx, 'Open_Time']
                 cur_stop_close_time = apc_cmp.loc[cur_stop_trip_idx, 'Close_Time']
                 cur_stop_dwell_time = apc_cmp.loc[cur_stop_trip_idx, 'DWELL_TIME']
@@ -393,6 +399,8 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj
                             apc_pairs.loc[pair_cnt, 'trip_id'] = cur_stop_trip_id
                             apc_pairs.loc[pair_cnt, 'trip_date'] = cur_stop_date
                             apc_pairs.loc[pair_cnt, 'vehicle_id'] = cur_stop_veh_id
+                            apc_pairs.loc[pair_cnt, 'route_alpha'] = cur_stop_route_alpha
+                            apc_pairs.loc[pair_cnt, 'direction'] = cur_stop_route_dir
     
                             apc_pairs.loc[pair_cnt, 'cur_stop_id'] = cur_stopid
                             apc_pairs.loc[pair_cnt, 'cur_stop_open_time'] = cur_stop_open_time
@@ -415,10 +423,14 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj
                                             apc_pairs['cur_next_rev_dis'])
     
     apc_pairs_clean = apc_pairs[apc_pairs['cur_stop_dwell_time']<180]
-    apc_trip_speeds = apc_pairs_clean.groupby(['cmp_segid', 'trip_id', 'trip_date']).agg({'cur_next_loc_dis': 'sum',
-                                                                        'cur_next_time': 'sum'}).reset_index()
+    apc_pairs_clean['route_alpha'] = apc_pairs_clean['route_alpha'].apply(lambda x: str(x).lstrip("0"))  #remove leading zeros
+    apc_pairs_clean['route_dir'] = apc_pairs_clean['route_alpha'].astype(str)  + '_' + apc_pairs_clean['direction']
     
-    apc_trip_speeds.columns = ['cmp_segid', 'trip_id', 'trip_date', 'trip_stop_distance', 'trip_traveltime']
+    grpby_cols = ['cmp_segid', 'trip_id', 'trip_date', 'route_dir']
+    apc_trip_speeds = apc_pairs_clean.groupby(grpby_cols).agg({'cur_next_loc_dis': 'sum',
+                                                                'cur_next_time': 'sum'}).reset_index()
+    
+    apc_trip_speeds.columns = grpby_cols + ['trip_stop_distance', 'trip_traveltime']
     apc_trip_speeds['trip_loc_speed'] = 3600* apc_trip_speeds['trip_stop_distance']/apc_trip_speeds['trip_traveltime']
     
     apc_trip_speeds = pd.merge(apc_trip_speeds, cmp_segs_prj[['cmp_segid', 'length']], on='cmp_segid', how='left')
@@ -438,6 +450,10 @@ def match_intermediate_apc_stops(apc_pairs, apc_cmp, overlap_pairs, cmp_segs_prj
     apc_cmp_speeds['source'] = 'APC'
     apc_cmp_speeds['period'] = timep
     
+    apc_cmp_speeds_routes = apc_trip_speeds_over50.groupby(['cmp_segid'])['route_dir'].agg(['unique']).reset_index()
+    apc_cmp_speeds_routes.columns = ['cmp_segid', 'comment']
+    apc_cmp_speeds = apc_cmp_speeds.merge(apc_cmp_speeds_routes, on='cmp_segid', how='left')
+    
     return apc_cmp_speeds
     
 # ## AM 
@@ -451,5 +467,5 @@ apc_cmp_speeds = apc_cmp_speeds_am.append(apc_cmp_speeds_pm, ignore_index=True)
 apc_cmp_speeds = apc_cmp_speeds[apc_cmp_speeds['sample_size']>=9]
 print('Number of segment-periods ', len(apc_cmp_speeds))
 
-out_cols = ['cmp_segid', 'year', 'source', 'period', 'avg_speed', 'std_dev', 'cov', 'sample_size']
+out_cols = ['cmp_segid', 'year', 'source', 'period', 'avg_speed', 'std_dev', 'cov', 'sample_size', 'comment']
 apc_cmp_speeds[out_cols].to_csv(os.path.join(OUT_DIR, 'CMP2021_APC_Transit_Speeds.csv'), index=False)
