@@ -8,26 +8,28 @@ from shapely import geometry
 from simpledbf import Dbf5
 import warnings
 warnings.filterwarnings('ignore')
+import configparser
+import sys
+
+config = configparser.ConfigParser()
+config.read(sys.argv[1])
 
 # GTFS directories, service ids, and years
-GTFS = [[r'C:\Users\xzh263\Dropbox (KTC)\SFCTA CMP\2021 CMP\Coverage\gtfs_2021may13', '1_merged_10007724', 2021],
-       [r'C:\Users\xzh263\Dropbox (KTC)\SFCTA CMP\2021 CMP\Coverage\gtfs_2020april9', 1, 2020],
-       [r'C:\Users\xzh263\Dropbox (KTC)\SFCTA CMP\2021 CMP\Coverage\gtfs_2019may22', '1_merged_8846826', 2019]]
+GTFS = config['GTFS']
 
 # Output directory
-Coverage_Dir = r'C:\Users\xzh263\Dropbox (KTC)\SFCTA CMP\2021 CMP\Coverage'
+Output_Dir = config['OUTPUT']['DIR']
 
-# OSM Streets
-Streets_Dir = r'C:\Users\xzh263\Dropbox (KTC)\SFCTA CMP\2021 CMP\Coverage\champ_hwy_shapefile'
-street_file = 'champ_freeflow.shp'
+# All Streets
+street_file = config['STREETS']['SHAPEFILE']
 
 #TAZ shapefile
-TAZ_Dir = Coverage_Dir
-taz_file = 'TAZ2454_clean\TAZ2454_clean.shp'
+taz_shapefile = config['ZONES']['SHAPEFILE']
+taz_datafile = config['ZONES']['DATAFILE']
 
 # define parameters needed by the calculation
-min_trips = 22
-buffer_radius = 0.25 * 5280 # a quarter mile walking distance
+min_trips = int(config['PARAMS']['MIN_TRIPS'])
+buffer_radius = float(config['PARAMS']['BUFFER_RAD_MI']) * 5280 # a quarter mile walking distance
 
 #Define NAD 1983 StatePlane California III
 cal3 = {'proj': 'lcc +lat_1=37.06666666666667 +lat_2=38.43333333333333 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000.0000000002', 'ellps': 'GRS80', 'datum': 'NAD83', 'no_defs': True}
@@ -94,7 +96,7 @@ def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname):
         route_frequent_shapes = route_frequent.merge(trips_shapes_mcv, on= period_cols, how='left')
         route_frequent_shapes = trips_shapes.merge(route_frequent_shapes, on='shape_id')
         route_frequent_shapes = route_frequent_shapes.merge(routes_info, on='route_id', how='left')
-        route_frequent_shapes.to_file(os.path.join(Coverage_Dir, 'frequent_routes_5min_' + outname + '_' + peak_period + '.shp'))
+        route_frequent_shapes.to_file(os.path.join(Output_Dir, 'frequent_routes_5min_' + outname + '_' + peak_period + '.shp'))
     else:
         print('No frequent routes found for %s %s' % (outname, peak_period))
     
@@ -115,19 +117,19 @@ def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname):
     if len(stop_frequent)>0:
         stop_frequent_list = stop_frequent.stop_id.unique().tolist()
         stop_frequent_gdf = stops[stops['stop_id'].isin(stop_frequent_list)]
-        stop_frequent_gdf.to_file(os.path.join(Coverage_Dir, 'frequent_stops_5min_' + outname + '_' + peak_period + '.shp'))
+        stop_frequent_gdf.to_file(os.path.join(Output_Dir, 'frequent_stops_5min_' + outname + '_' + peak_period + '.shp'))
     else:
         print('No frequent stops found for %s %s' % (outname, peak_period))
         stop_frequent_list=[]
     return stop_frequent_list, route_period_counts, stop_period_counts
     
 # TAZ Zones
-taz_shp = gp.read_file(os.path.join(TAZ_Dir, taz_file))
+taz_shp = gp.read_file(taz_shapefile)
 taz_sf_shp = taz_shp[taz_shp['COUNTY']==1] 
 taz_sf_shp = taz_sf_shp.to_crs(cal3)
 
 # Streets network
-streets = gp.read_file(os.path.join(Streets_Dir, street_file))
+streets = gp.read_file(street_file)
 streets.insert(0, 'LinkID', range(1, len(streets)+1))
 streets = streets.to_crs(cal3)
 
@@ -258,7 +260,7 @@ def frequent_access_area(walk_graph, stop_list, stop_with_nearest_link, buffer_r
     return stop_access_gdf
     
 # Attach TAZ attributes
-taz_dbf = Dbf5(os.path.join(Coverage_Dir, 'tazdata.dbf'))
+taz_dbf = Dbf5(taz_datafile)
 taz = taz_dbf.to_dataframe()
 taz['SFTAZ'] = taz['SFTAZ'].astype(int)
 taz_sf = taz_sf_shp.merge(taz, left_on = 'TAZ', right_on = 'SFTAZ', how = 'left')
@@ -286,29 +288,28 @@ def frequent_stops_access_taz(frequent_stops_access_union):
 
 df_coverage = pd.DataFrame()
 idx = 0
-for gtfs_id_year in GTFS:
-    stops_within_sf, stop_near_links, tgraph = build_walking_network(gtfs_id_year[0])
-    for period in ['AM', 'PM']:
-        df_coverage.loc[idx, 'year'] = int(gtfs_id_year[2])
-        df_coverage.loc[idx, 'period'] = period
+stops_within_sf, stop_near_links, tgraph = build_walking_network(GTFS['DIR'])
+for period in ['AM', 'PM']:
+    df_coverage.loc[idx, 'year'] = int(GTFS['YEAR'])
+    df_coverage.loc[idx, 'period'] = period
+    
+    stop_frequent_list, route_period_counts, stop_period_counts = frequent_bus_routes(GTFS['DIR'], GTFS['SERVICE_ID'], period, GTFS['YEAR'])
+    stop_frequent_list_with_sf = [stopid for stopid in stop_frequent_list if stopid in stops_within_sf['stop_id'].tolist()]
+    if len(stop_frequent_list_with_sf)>0:
+        frequent_stops_access_area = frequent_access_area(tgraph, stop_frequent_list_with_sf, stop_near_links, buffer_radius)
+        frequent_stops_access_area.to_crs(epsg=4326).to_file(os.path.join(Output_Dir, 'frequent_stops_5min_' + GTFS['YEAR'] + '_' + period + 'buffer.shp'))
+        frequent_stops_access_union = frequent_stops_access_area.geometry.unary_union
+        frequent_access_taz_attrs = frequent_stops_access_taz(frequent_stops_access_union)
+        df_coverage.loc[idx, 'cover_area'] = round(100*frequent_access_taz_attrs['accessarea'].sum()/frequent_access_taz_attrs['area_acre'].sum(),2)
+        df_coverage.loc[idx, 'cover_pop'] = round(100*frequent_access_taz_attrs['access_pop'].sum()/frequent_access_taz_attrs['POP'].sum(),2)
+        df_coverage.loc[idx, 'cover_jobs'] = round(100*frequent_access_taz_attrs['access_jobs'].sum()/frequent_access_taz_attrs['TOTALEMP'].sum(),2)
+        df_coverage.loc[idx, 'cover_hhlds'] = round(100*frequent_access_taz_attrs['access_hhlds'].sum()/frequent_access_taz_attrs['HHLDS'].sum(),2)
+    else:
+        df_coverage.loc[idx, 'cover_area']= 0
+        df_coverage.loc[idx, 'cover_pop']= 0
+        df_coverage.loc[idx, 'cover_jobs']= 0
+        df_coverage.loc[idx, 'cover_hhlds']= 0
+        df_coverage.loc[idx, 'note'] = 'No frequent stops found'
+    idx += 1
         
-        stop_frequent_list, route_period_counts, stop_period_counts = frequent_bus_routes(gtfs_id_year[0], gtfs_id_year[1], period, str(gtfs_id_year[2]))
-        stop_frequent_list_with_sf = [stopid for stopid in stop_frequent_list if stopid in stops_within_sf['stop_id'].tolist()]
-        if len(stop_frequent_list_with_sf)>0:
-            frequent_stops_access_area = frequent_access_area(tgraph, stop_frequent_list_with_sf, stop_near_links, buffer_radius)
-            frequent_stops_access_area.to_file(os.path.join(Coverage_Dir, 'frequent_stops_5min_' + str(gtfs_id_year[2]) + '_' + period + 'buffer.shp'))
-            frequent_stops_access_union = frequent_stops_access_area.geometry.unary_union
-            frequent_access_taz_attrs = frequent_stops_access_taz(frequent_stops_access_union)
-            df_coverage.loc[idx, 'cover_area'] = round(100*frequent_access_taz_attrs['accessarea'].sum()/frequent_access_taz_attrs['area_acre'].sum(),2)
-            df_coverage.loc[idx, 'cover_pop'] = round(100*frequent_access_taz_attrs['access_pop'].sum()/frequent_access_taz_attrs['POP'].sum(),2)
-            df_coverage.loc[idx, 'cover_jobs'] = round(100*frequent_access_taz_attrs['access_jobs'].sum()/frequent_access_taz_attrs['TOTALEMP'].sum(),2)
-            df_coverage.loc[idx, 'cover_hhlds'] = round(100*frequent_access_taz_attrs['access_hhlds'].sum()/frequent_access_taz_attrs['HHLDS'].sum(),2)
-        else:
-            df_coverage.loc[idx, 'cover_area']= 0
-            df_coverage.loc[idx, 'cover_pop']= 0
-            df_coverage.loc[idx, 'cover_jobs']= 0
-            df_coverage.loc[idx, 'cover_hhlds']= 0
-            df_coverage.loc[idx, 'note'] = 'No frequent stops found'
-        idx += 1
-        
-df_coverage.to_csv(os.path.join(Coverage_Dir, 'cmp_transit_coverage_metrics.csv'), index=False)
+df_coverage.to_csv(os.path.join(Output_Dir, 'cmp_transit_coverage_metrics_%s.csv' %GTFS['YEAR']), index=False)
