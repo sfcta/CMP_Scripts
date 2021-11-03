@@ -101,14 +101,15 @@ def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname):
         print('No frequent routes found for %s %s' % (outname, peak_period))
     
     # frequent stops
+    trips_period = route_frequent[['route_id', 'direction_id']].merge(trips_period, how='left')
     stop_cols = ['stop_id', 'route_id', 'direction_id']
-    stop_times_by_route = stop_times.merge(trips[['route_id', 'direction_id', 'trip_id']], on='trip_id', how='left')
-    if peak_period == 'AM':
-        stop_route_period = stop_times_by_route[(stop_times_by_route['hour']>=7) & (stop_times_by_route['hour']<9)]
-    elif peak_period == 'PM':
-        stop_route_period = stop_times_by_route[((stop_times_by_route['hour']==16) & (stop_times_by_route['minute']>=30)) | (stop_times_by_route['hour']==17) | ((stop_times_by_route['hour']==18) & (stop_times_by_route['minute']<30))]
-    else:
-        print('Input needs to be either AM or PM')
+    stop_route_period = stop_times.merge(trips_period[['route_id', 'direction_id', 'trip_id']], on='trip_id')
+#     if peak_period == 'AM':
+#         stop_route_period = stop_times_by_route[(stop_times_by_route['hour']>=7) & (stop_times_by_route['hour']<9)]
+#     elif peak_period == 'PM':
+#         stop_route_period = stop_times_by_route[((stop_times_by_route['hour']==16) & (stop_times_by_route['minute']>=30)) | (stop_times_by_route['hour']==17) | ((stop_times_by_route['hour']==18) & (stop_times_by_route['minute']<30))]
+#     else:
+#         print('Input needs to be either AM or PM')
         
     stop_period_counts = stop_route_period.groupby(stop_cols).trip_id.count().reset_index()
     stop_period_counts.columns = stop_cols + ['total_trips']
