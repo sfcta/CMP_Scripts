@@ -234,7 +234,8 @@ def stop_walking_area(walk_graph, walk_dis, start_node, link_near_stop):
     geom = [x for x in streets_access.geometry]
     multi_line = geometry.MultiLineString(geom)
     multi_line_polygon = multi_line.convex_hull
-    
+    if multi_line_polygon.geom_type != 'Polygon':
+        multi_line_polygon = multi_line_polygon.envelope
     return multi_line_polygon
     
 # Accessible area from high frequent stops
