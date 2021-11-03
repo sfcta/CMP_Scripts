@@ -19,6 +19,7 @@ GTFS = config['GTFS']
 
 # Output directory
 Output_Dir = config['OUTPUT']['DIR']
+output_tag = config['OUTPUT']['TAG']
 
 # All Streets
 street_file = config['STREETS']['SHAPEFILE']
@@ -96,7 +97,7 @@ def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname):
         route_frequent_shapes = route_frequent.merge(trips_shapes_mcv, on= period_cols, how='left')
         route_frequent_shapes = trips_shapes.merge(route_frequent_shapes, on='shape_id')
         route_frequent_shapes = route_frequent_shapes.merge(routes_info, on='route_id', how='left')
-        route_frequent_shapes.to_file(os.path.join(Output_Dir, 'frequent_routes_5min_' + outname + '_' + peak_period + '.shp'))
+        route_frequent_shapes.to_file(os.path.join(Output_Dir, 'frequent_routes_' + output_tag + '_' + outname + '_' + peak_period + '.shp'))
     else:
         print('No frequent routes found for %s %s' % (outname, peak_period))
     
@@ -118,7 +119,7 @@ def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname):
     if len(stop_frequent)>0:
         stop_frequent_list = stop_frequent.stop_id.unique().tolist()
         stop_frequent_gdf = stops[stops['stop_id'].isin(stop_frequent_list)]
-        stop_frequent_gdf.to_file(os.path.join(Output_Dir, 'frequent_stops_5min_' + outname + '_' + peak_period + '.shp'))
+        stop_frequent_gdf.to_file(os.path.join(Output_Dir, 'frequent_stops_' + output_tag + '_' + outname + '_' + peak_period + '.shp'))
     else:
         print('No frequent stops found for %s %s' % (outname, peak_period))
         stop_frequent_list=[]
@@ -299,7 +300,7 @@ for period in ['AM', 'PM']:
     stop_frequent_list_with_sf = [stopid for stopid in stop_frequent_list if stopid in stops_within_sf['stop_id'].tolist()]
     if len(stop_frequent_list_with_sf)>0:
         frequent_stops_access_area = frequent_access_area(tgraph, stop_frequent_list_with_sf, stop_near_links, buffer_radius)
-        frequent_stops_access_area.to_crs(epsg=4326).to_file(os.path.join(Output_Dir, 'frequent_stops_5min_' + GTFS['YEAR'] + '_' + period + 'buffer.shp'))
+        frequent_stops_access_area.to_crs(epsg=4326).to_file(os.path.join(Output_Dir, 'frequent_stops_' + output_tag + '_' + GTFS['YEAR'] + '_' + period + 'buffer.shp'))
         frequent_stops_access_union = frequent_stops_access_area.geometry.unary_union
         frequent_access_taz_attrs = frequent_stops_access_taz(frequent_stops_access_union)
         df_coverage.loc[idx, 'cover_area'] = round(100*frequent_access_taz_attrs['accessarea'].sum()/frequent_access_taz_attrs['area_acre'].sum(),2)
