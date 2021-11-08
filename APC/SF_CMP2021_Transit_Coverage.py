@@ -58,6 +58,7 @@ def generate_transit_shapes_geo(stop_dir, service_id):
     shapes_gdf.columns = ['shape_id', 'geometry']
     
     trips = pd.read_csv(os.path.join(stop_dir, 'trips.txt'))
+    trips['service_id'] = trips['service_id'].astype(str)
     trips = trips[trips['service_id']==service_id]
     trips_shapes = shapes_gdf[shapes_gdf['shape_id'].isin(trips['shape_id'])]
     return trips, shapes, trips_shapes
