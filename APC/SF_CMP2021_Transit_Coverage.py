@@ -35,6 +35,15 @@ buffer_radius = float(config['PARAMS']['BUFFER_RAD_MI']) * 5280 # a quarter mile
 #Define NAD 1983 StatePlane California III
 cal3 = {'proj': 'lcc +lat_1=37.06666666666667 +lat_2=38.43333333333333 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000.0000000002', 'ellps': 'GRS80', 'datum': 'NAD83', 'no_defs': True}
 
+COMBINE_ROUTES = [
+                    [['5', '5R'], '5+5R'],
+                    [['9', '9R'], '9+9R'],
+                    [['14', '14R'], '14+14R'],
+                    [['38', '38R'], '38+38R'],
+                    [['47', '49'], '47+49'],
+                    [['KT', 'M'], 'KT+M']
+                ]
+
 # Define Functions
 def generate_transit_stops_geo(stop_dir):
     stops=pd.read_csv(os.path.join(stop_dir, 'stops.txt'))
@@ -72,6 +81,15 @@ def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname):
     stop_times['hour'] = stop_times['arrival_time'].apply(lambda x: int(x[0:2]))
     stop_times['minute'] = stop_times['arrival_time'].apply(lambda x: int(x[3:5]))
     
+    for rec in COMBINE_ROUTES:
+        route_ids = list(routes_info.loc[routes_info['route_short_name'].isin(rec[0]), 'route_id'].values)
+        if len(route_ids) > 0:
+            new_id = route_ids[0]
+            routes_info.loc[routes_info['route_short_name'].isin(rec[0]), 'route_id'] = new_id
+            routes_info.loc[routes_info['route_short_name'].isin(rec[0]), 'route_short_name'] = rec[1]
+            
+            trips.loc[trips['route_id'].isin(route_ids), 'route_id'] = new_id
+    
     period_cols = ['route_id', 'direction_id']
     #There may be multiples shapes for the same route, so here the most frequent shape is used for each route_id
     trips_shapes_mcv = trips.groupby(period_cols)['shape_id'].agg(lambda x:x.value_counts().index[0]).reset_index()
@@ -106,12 +124,6 @@ def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname):
     trips_period = route_frequent[['route_id', 'direction_id']].merge(trips_period, how='left')
     stop_cols = ['stop_id', 'route_id', 'direction_id']
     stop_route_period = stop_times.merge(trips_period[['route_id', 'direction_id', 'trip_id']], on='trip_id')
-#     if peak_period == 'AM':
-#         stop_route_period = stop_times_by_route[(stop_times_by_route['hour']>=7) & (stop_times_by_route['hour']<9)]
-#     elif peak_period == 'PM':
-#         stop_route_period = stop_times_by_route[((stop_times_by_route['hour']==16) & (stop_times_by_route['minute']>=30)) | (stop_times_by_route['hour']==17) | ((stop_times_by_route['hour']==18) & (stop_times_by_route['minute']<30))]
-#     else:
-#         print('Input needs to be either AM or PM')
         
     stop_period_counts = stop_route_period.groupby(stop_cols).trip_id.count().reset_index()
     stop_period_counts.columns = stop_cols + ['total_trips']
