@@ -24,16 +24,19 @@ output_tag = config['OUTPUT']['TAG']
 # All Streets
 street_file = config['STREETS']['SHAPEFILE']
 
-#TAZ shapefile
-taz_shapefile = config['ZONES']['SHAPEFILE']
-taz_datafile = config['ZONES']['DATAFILE']
+#MAZ data
+geo_shapefile = config['ZONES']['SHAPEFILE']
+geo_datafile = config['ZONES']['DATAFILE']
+geo_ctlfile = config['ZONES']['CONTROLFILE']
 
 # define parameters needed by the calculation
 min_trips = int(config['PARAMS']['MIN_TRIPS'])
 buffer_radius = float(config['PARAMS']['BUFFER_RAD_MI']) * 5280 # a quarter mile walking distance
+min_intersect_area_prop = float(config['PARAMS']['MIN_INTERSECT_AREA'])
 
 #Define NAD 1983 StatePlane California III
-cal3 = {'proj': 'lcc +lat_1=37.06666666666667 +lat_2=38.43333333333333 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000.0000000002', 'ellps': 'GRS80', 'datum': 'NAD83', 'no_defs': True}
+# cal3 = {'proj': 'lcc +lat_1=37.06666666666667 +lat_2=38.43333333333333 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000.0000000002', 'ellps': 'GRS80', 'datum': 'NAD83', 'no_defs': True}
+cal3 = 'EPSG:2227'
 
 COMBINE_ROUTES = [
                     [['5', '5R'], '5+5R'],
@@ -139,9 +142,9 @@ def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname):
     return stop_frequent_list, route_period_counts, stop_period_counts
     
 # TAZ Zones
-taz_shp = gp.read_file(taz_shapefile)
-taz_sf_shp = taz_shp[taz_shp['COUNTY']==1] 
-taz_sf_shp = taz_sf_shp.to_crs(cal3)
+geo_shp = gp.read_file(geo_shapefile)
+geo_shp = geo_shp[geo_shp['COUNTY']==1] 
+geo_shp = geo_shp.to_crs(cal3)
 
 # Streets network
 streets = gp.read_file(street_file)
@@ -179,7 +182,7 @@ endnodes_cnt.columns = ['E_Lat', 'E_Long', 'E_NodeCnt', 'E_NodeID']
 streets = streets.merge(endnodes_cnt, on=['E_Lat', 'E_Long'], how='left')
 endnodes_cnt.columns = ['Lat', 'Long', 'NodeCnt', 'NodeID']
 
-streets['length'] = 3.2808 * streets.geometry.length
+streets['length'] = streets.geometry.length
 streets['b_e'] = list(zip(streets['B_NodeID'], streets['E_NodeID']))
 streets['e_b'] = list(zip(streets['E_NodeID'], streets['B_NodeID']))
 # Save the updated street shapefile with endnodes
@@ -191,7 +194,7 @@ def build_walking_network(gtfs_dir):
     stops = generate_transit_stops_geo(gtfs_dir)
     stops = stops.to_crs(cal3)
     
-    stops_within_sf = gp.sjoin(stops, taz_sf_shp, op='within').reset_index()
+    stops_within_sf = gp.sjoin(stops, geo_shp, op='within').reset_index()
     stops_within_sf = stops_within_sf[stops.columns]
     stops_within_sf.insert(0, 'NodeID', range(endnodes_cnt['NodeID'].max() + 1, endnodes_cnt['NodeID'].max() + 1 + len(stops_within_sf)))
     
@@ -199,14 +202,14 @@ def build_walking_network(gtfs_dir):
 
     stops_geo = stops_within_sf.copy()
     stops_geo['point_geo'] = stops_geo['geometry']
-    stops_geo['geometry'] = stops_geo['geometry'].buffer(search_radius/3.2808)
+    stops_geo['geometry'] = stops_geo['geometry'].buffer(search_radius)
     stop_near_links = gp.sjoin(streets[['LinkID', 'B_NodeID', 'E_NodeID', 'length', 'geometry']], stops_geo, op='intersects')
 
     def calc_dist(x):
         stop_point = x['point_geo']
         link_geo = x['geometry']
         x['near_dist'] = stop_point.distance(link_geo)
-        x['stop_to_begin'] = link_geo.project(stop_point) * 3.2808  #meters to feet
+        x['stop_to_begin'] = link_geo.project(stop_point)
         x['stop_to_end'] = x['length'] - x['stop_to_begin']
         return x
 
@@ -275,32 +278,29 @@ def frequent_access_area(walk_graph, stop_list, stop_with_nearest_link, buffer_r
         stop_access_gdf = stop_access_gdf.append(cur_access_polygon, ignore_index=True)
     return stop_access_gdf
     
-# Attach TAZ attributes
-taz_dbf = Dbf5(taz_datafile)
-taz = taz_dbf.to_dataframe()
-taz['SFTAZ'] = taz['SFTAZ'].astype(int)
-taz_sf = taz_sf_shp.merge(taz, left_on = 'TAZ', right_on = 'SFTAZ', how = 'left')
-taz_sf["area_acre"] = taz_sf['geometry'].area * 0.00024711 #Square meters to acres
+# Attach MAZ attributes
+geo_control = pd.read_csv(geo_ctlfile)
+pop_control = geo_control.loc[geo_control['year']==int(GTFS['YEAR']), 'population'].iloc[0]
+emp_control = geo_control.loc[geo_control['year']==int(GTFS['YEAR']), 'jobs'].iloc[0]
 
-def frequent_stops_access_taz(frequent_stops_access_union):
-    frequent_stops_access_taz= taz_sf_shp['geometry'].intersection(frequent_stops_access_union)
+geo_data = pd.read_csv(geo_datafile, sep=' ')
+geo_data = geo_data[geo_data['taz_p']<1000]
+geo_data = geo_data[['parcelid','hh_p','emptot_p']]
+geo_data['pop_p'] = (geo_data['hh_p']/geo_data['hh_p'].sum())*pop_control
+geo_data['emptot_p'] = (geo_data['emptot_p']/geo_data['emptot_p'].sum())*emp_control
+geo_shp['MAZID'] = geo_shp['MAZID'].astype('int64')
+geo_data['parcelid'] = geo_data['parcelid'].astype('int64')
+geo_data = geo_shp[['MAZID','geometry']].merge(geo_data, left_on='MAZID', right_on='parcelid')
 
-    taz_sf_access_gdf = gp.GeoDataFrame()
-    taz_sf_access_gdf['accessarea'] = frequent_stops_access_taz.area* 0.00024711 #Square meters to acres
-    taz_sf_access_gdf['index'] = frequent_stops_access_taz.index
-    taz_sf_access_gdf['geometry'] = frequent_stops_access_taz.geometry
-
-    taz_sf_access_tazid = taz_sf_access_gdf.merge(taz_sf_shp[['TAZ', 'AREALAND']], left_on='index', right_index=True, how='left')
-    taz_sf_access_attrs = taz_sf[['TAZ', 'AREALAND', 'HHLDS', 'TOTALEMP', 'POP', 'area_acre']].merge(taz_sf_access_tazid, on=['TAZ', 'AREALAND'], how='left')
+def frequent_stops_access_geo(frequent_stops_access_union):
+    frequent_stops_access_geo = gp.overlay(geo_shp, gp.GeoDataFrame({'geometry':[frequent_stops_access_union]}, crs=cal3))
+    frequent_stops_access_geo['area_prop'] = frequent_stops_access_geo.geometry.area/frequent_stops_access_geo['Shape_Area']
+    frequent_stops_access_geo = frequent_stops_access_geo[frequent_stops_access_geo['area_prop']>=min_intersect_area_prop]
+    geo_ids = frequent_stops_access_geo['MAZID'].unique()
+    frequent_stops_access_data = geo_data[geo_data['MAZID'].isin(geo_ids)] 
     
-    taz_sf_access_attrs['areapcnt'] = 100 * taz_sf_access_attrs['accessarea'] / taz_sf_access_attrs['area_acre']
-    taz_sf_access_attrs['access_pop'] = taz_sf_access_attrs['POP'] * taz_sf_access_attrs['areapcnt'] / 100 
-    taz_sf_access_attrs['access_jobs'] = taz_sf_access_attrs['TOTALEMP'] * taz_sf_access_attrs['areapcnt'] / 100 
-    taz_sf_access_attrs['access_hhlds'] = taz_sf_access_attrs['HHLDS'] * taz_sf_access_attrs['areapcnt'] / 100 
-    
-    outcols = ['accessarea', 'index', 'TAZ', 'AREALAND', 'HHLDS', 'TOTALEMP',
-           'POP', 'area_acre', 'areapcnt', 'access_pop', 'access_jobs', 'access_hhlds']    
-    return taz_sf_access_attrs[outcols]
+#     df_access_geo = gp.GeoDataFrame({'geometry':[frequent_stops_access_geo.geometry.unary_union]}, crs=cal3)
+    return frequent_stops_access_data, geo_ids
 
 df_coverage = pd.DataFrame()
 idx = 0
@@ -315,17 +315,18 @@ for period in ['AM', 'PM']:
         frequent_stops_access_area = frequent_access_area(tgraph, stop_frequent_list_with_sf, stop_near_links, buffer_radius)
         frequent_stops_access_area.to_crs(epsg=4326).to_file(os.path.join(Output_Dir, 'frequent_stops_' + output_tag + '_' + GTFS['YEAR'] + '_' + period + 'buffer.shp'))
         frequent_stops_access_union = frequent_stops_access_area.geometry.unary_union
-        frequent_access_taz_attrs = frequent_stops_access_taz(frequent_stops_access_union)
-        df_coverage.loc[idx, 'cover_area'] = round(100*frequent_access_taz_attrs['accessarea'].sum()/frequent_access_taz_attrs['area_acre'].sum(),2)
-        df_coverage.loc[idx, 'cover_pop'] = round(100*frequent_access_taz_attrs['access_pop'].sum()/frequent_access_taz_attrs['POP'].sum(),2)
-        df_coverage.loc[idx, 'cover_jobs'] = round(100*frequent_access_taz_attrs['access_jobs'].sum()/frequent_access_taz_attrs['TOTALEMP'].sum(),2)
-        df_coverage.loc[idx, 'cover_hhlds'] = round(100*frequent_access_taz_attrs['access_hhlds'].sum()/frequent_access_taz_attrs['HHLDS'].sum(),2)
+        frequent_access_geo_attrs, geo_ids = frequent_stops_access_geo(frequent_stops_access_union)
+        geo_shp.loc[geo_shp['MAZID'].isin(geo_ids), ['MAZID','geometry']].to_crs(epsg=4326).to_file(os.path.join(Output_Dir, 'coverage_' + output_tag + '_' + GTFS['YEAR'] + '_' + period + 'buffer.shp'))
+        
+        df_coverage.loc[idx, 'cover_pop'] = frequent_access_geo_attrs['pop_p'].sum()
+        df_coverage.loc[idx, 'cover_jobs'] = frequent_access_geo_attrs['emptot_p'].sum()
     else:
-        df_coverage.loc[idx, 'cover_area']= 0
         df_coverage.loc[idx, 'cover_pop']= 0
         df_coverage.loc[idx, 'cover_jobs']= 0
-        df_coverage.loc[idx, 'cover_hhlds']= 0
-        df_coverage.loc[idx, 'note'] = 'No frequent stops found'
+    df_coverage.loc[idx, 'tot_pop'] = geo_data['pop_p'].sum()
+    df_coverage.loc[idx, 'tot_jobs'] = geo_data['emptot_p'].sum()
+    df_coverage.loc[idx, 'cover_pop_pct'] = round(100*df_coverage.loc[idx, 'cover_pop']/df_coverage.loc[idx, 'tot_pop'],2)
+    df_coverage.loc[idx, 'cover_jobs_pct'] = round(100*df_coverage.loc[idx, 'cover_jobs']/df_coverage.loc[idx, 'tot_jobs'],2)
     idx += 1
         
 df_coverage.to_csv(os.path.join(Output_Dir, 'cmp_transit_coverage_metrics_%s.csv' %GTFS['YEAR']), index=False)
