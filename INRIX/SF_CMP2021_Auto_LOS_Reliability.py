@@ -25,7 +25,7 @@ ss_threshold = 180
 r_spatial_thrd= 70  # to be consistent with the minimum value used in LOS calculation
 
 # Input CMP segment shapefile
-cmp_segs=gp.read_file(os.path.join(r'Q:\CMP\LOS Monitoring 2021\CMP_plus_shp', 'cmp_segments_plus.shp'))
+cmp_segs=gp.read_file(os.path.join(r'Q:\CMP\LOS Monitoring 2021\CMP_plus_shp\old_cmp_plus', 'cmp_segments_plus.shp'))
 
 # Get CMP and INRIX correspondence table
 conflation = pd.read_csv(os.path.join(NETCONF_DIR, CORR_FILE))
