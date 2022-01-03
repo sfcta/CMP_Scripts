@@ -5,8 +5,12 @@ import numpy as np
 import holidays
 
 #UK path
-PEMSDIR = r'D:\PeMS'
-OUTDIR = r'D:\PeMS'
+# PEMSDIR = r'D:\PeMS'
+# OUTDIR = r'D:\PeMS'
+
+#SFCTA paths
+PEMSDIR = r'Q:\Data\Observed\Streets\PeMS\CMP'
+OUTDIR = r'Q:\CMP\LOS Monitoring 2021\PeMS\test_output'
 
 monitor_loc = pd.read_csv(os.path.join(PEMSDIR,'pems_monitoring_locations.csv'))
 stations = pd.read_csv(os.path.join(PEMSDIR,'D4_Data_2021\station_meta\d04_text_meta_2021_03_19.txt'), delimiter = "\t")
