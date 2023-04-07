@@ -3,10 +3,6 @@ import geopandas as gpd
 from os.path import join
 
 
-# downloaded from INRIX
-bayarea_gis_filename_noext = "USA_CA_BayArea_shapefile"  # without .shp or .zip
-
-
 def _map_dir(map_release_version: str) -> str:
     return join("Q:\GIS\Transportation\Roads\INRIX\XD", map_release_version)
 
@@ -33,13 +29,25 @@ def read_bayarea_xd_segments(
         whether to filter for SF segments only
     """
     map_dir = _map_dir(map_release_version)
+    # as downloaded from INRIX, without .shp or .zip:
+    bayarea_gis_filename_noext = "USA_CA_BayArea_shapefile"
     filepath = join(
         map_dir,
         "maprelease-shapefiles",
-        f"{bayarea_gis_filename_noext}.zip!{bayarea_gis_filename_noext}",
+        f"{bayarea_gis_filename_noext}.zip",
     )
-    gdf = gpd.read_file(f"zip://{filepath}")
+    if map_release_version >= "2301":
+        gdf = gpd.read_file(f"zip://{filepath}!{bayarea_gis_filename_noext}")
+    else:
+        gdf = gpd.read_file(f"zip://{filepath}")
+    gdf["XDSegID"] = gdf["XDSegID"].astype(int)
     if sf_only:
         # filter for segments in SF only
         gdf = gdf[gdf.County == "SAN FRANCISCO"]
+    return gdf
+
+
+def read_sf_xd_segments(map_release_version: str) -> gpd.GeoDataFrame:
+    gdf = gpd.read_file(sf_gis_filepath(map_release_version))
+    gdf["XDSegID"] = gdf["XDSegID"].astype(int)
     return gdf
