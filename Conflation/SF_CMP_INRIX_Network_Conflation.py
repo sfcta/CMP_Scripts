@@ -21,15 +21,17 @@ To use the script, place the script under the same folder with input files and r
 python SF_CMP_INRIX_Network_Conflation.py
 '''
 
-MAP_VER = 2001
+MAP_VER = 2301
 
 # Specify input file names
 # INRIX XD network
-# inrix_sf = 'inrix_xd_sf'
-inrix_sf = 'Inrix_XD_2001_SF'
+inrix_sf = f'INRIX_XD-SF-{MAP_VER}'  # .gpkg'  # HOTFIX, leaving the extension hardcoded below
 segid_col = 'XDSegID'
 # CMP network
-cmp = 'cmp_roadway_segments'
+# CMP network (as in the reports)
+# cmp = "Q:\GIS\Transportation\Roads\CMP\cmp_roadway_segments"  # .shp"  # HOTFIX, leaving the extension hardcoded below
+# online COVID congestion tracker network:
+cmp = "Q:\CMP\LOS Monitoring 2022\CMP_exp_shp\cmp_segments_exp_v2201"  # .shp"  # HOTFIX, leaving the extension hardcoded below
 
 
 # Import needed python modules
@@ -40,6 +42,7 @@ import geopandas as gp
 import pandas as pd
 import numpy as np
 import math
+import os
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -55,17 +58,17 @@ cmp_segs_prj = cmp_segs_org.to_crs(cal3)
 cmp_segs_prj['cmp_name'] = cmp_segs_prj['cmp_name'].str.replace('/ ','/')
 cmp_segs_prj['Length'] = cmp_segs_prj.geometry.length 
 cmp_segs_prj['Length'] = cmp_segs_prj['Length'] * 3.2808  #meters to feet
-cmp_segs_prj.to_file(cmp + '_prj.shp')
+cmp_segs_prj.to_file(os.path.splitext(cmp)[0] + '_prj.shp')
 
 # INRIX XD network
-inrix_net_org=gp.read_file(inrix_sf + '.shp')
+inrix_net_org=gp.read_file(inrix_sf + '.gpkg')  # HOTFIX, leaving this hardcoded for now, switched from .shp to .gpkg
 inrix_net_prj = inrix_net_org.to_crs(cal3)
 inrix_net_prj['Length'] = inrix_net_prj.geometry.length 
 inrix_net_prj['Length'] = inrix_net_prj['Length'] * 3.2808  #meters to feet
 inrix_net_prj['SegID'] = inrix_net_prj[segid_col].astype(int)
 inrix_net_prj['Miles'] = inrix_net_prj['Miles'].astype(float)
 inrix_net_prj = inrix_net_prj.rename(columns = {'PreviousXD':'PreviousSe', 'NextXDSegI':'NextSegID'})
-inrix_net_prj.to_file(inrix_sf + '_prj.shp')
+inrix_net_prj.to_file(os.path.splitext(inrix_sf)[0] + '_prj.shp')
 
 
 # # Get endpoints of INRIX links
@@ -933,12 +936,12 @@ inrix_lines_matched_output.to_csv('CMP_Segment_INRIX_Links_Correspondence_%s.csv
 MANUAL_UPDATE = True
 if MANUAL_UPDATE:
     cols = inrix_lines_matched_output.columns
-    rem_df = pd.read_csv('manual_remove.csv')
+    rem_df = pd.read_csv(r'Q:\CMP\LOS Monitoring 2022\Network_Conflation\v2202\conflation_script_test\manual_remove.csv')
     rem_df['del_flag'] = 1
     inrix_lines_matched_output = inrix_lines_matched_output.merge(rem_df, how='left')
     inrix_lines_matched_output = inrix_lines_matched_output.loc[pd.isna(inrix_lines_matched_output['del_flag']), ]
     
-    add_df = pd.read_csv('manual_add.csv')
+    add_df = pd.read_csv(r'Q:\CMP\LOS Monitoring 2022\Network_Conflation\v2202\conflation_script_test\manual_add.csv')
     inrix_lines_matched_output = inrix_lines_matched_output[cols]
     inrix_lines_matched_output = inrix_lines_matched_output.append(add_df)
     inrix_lines_matched_output.to_csv('CMP_Segment_INRIX_Links_Correspondence_%s_Manual.csv' %MAP_VER, index=False)
