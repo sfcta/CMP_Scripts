@@ -8,48 +8,78 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # SFCTA Paths
-NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2021\Network_Conflation'
-CORR_FILE = r'CMP_Segment_INRIX_Links_Correspondence_2101_Manual_PLUS_ExpandedNetwork.csv'
+NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2019\Network_Conflation\XD_20_01'
+CORR_FILE = r'CMP_Segment_INRIX_Links_Correspondence_2001_Manual_PLUS_ExpandedNetwork.csv'
 
-DATA_DIR = r'Q:\Data\Observed\Streets\INRIX\v2101'
+DATA_DIR = r'Q:\Data\Observed\Streets\INRIX\v2001'
 
 OUT_DIR = r'Q:\CMP\Congestion_Tracker\viz_data'
 
-# OUT_FILE = 'Mar2021_AutoSpeeds_4.csv'
-# INPUT_PATHS = [['All_SF_2021-03-21_to_2021-03-28_1_min_part_', 4]]
+# OUT_FILE = ['Mar2020_AutoSpeeds', '1']
+# INPUT_PATHS = [['All_SF_2020-03-02_to_2020-03-20_1_min_part_', 8]]
 
-# OUT_FILE = 'Mar2021_AutoSpeeds_5.csv'
-# INPUT_PATHS = [['All_SF_2021-03-28_to_2021-04-04_1_min_part_', 4]]
+# OUT_FILE = ['Mar2020_AutoSpeeds', '2']
+# INPUT_PATHS = [['All_SF_2020-03-20_to_2020-03-28_1_min_part_', 4]]
 
-# OUT_FILE = 'Apr2021_AutoSpeeds_1.csv'
-# INPUT_PATHS = [['All_SF_2021-04-04_to_2021-04-11_1_min_part_', 4]]
+# OUT_FILE = ['Apr2020_AutoSpeeds', '1']
+# INPUT_PATHS = [['All_SF_2020-03-30_to_2020-04-12_1_min_part_', 6]]
 
-# OUT_FILE = 'Apr2021_AutoSpeeds_2.csv'
-# INPUT_PATHS = [['All_SF_2021-04-11_to_2021-04-18_1_min_part_', 4]]
+# OUT_FILE = ['Apr2020_AutoSpeeds', '2']
+# INPUT_PATHS = [['All_SF_2020-04-12_to_2020-04-20_1_min_part_', 4]]
 
-# OUT_FILE = 'Apr2021_AutoSpeeds_3.csv'
-# INPUT_PATHS = [['All_SF_2021-04-18_to_2021-04-25_1_min_part_', 4]]
+# OUT_FILE = ['Apr2020_AutoSpeeds', '3']
+# INPUT_PATHS = [['All_SF_2020-04-20_to_2020-05-16_1_min_part_', 11]]
 
-# OUT_FILE = 'Apr2021_AutoSpeeds_4.csv'
-# INPUT_PATHS = [['All_SF_2021-04-25_to_2021-05-02_1_min_part_', 4]]
+# OUT_FILE = ['May2020_AutoSpeeds', '1']
+# INPUT_PATHS = [['All_SF_2020-05-16_to_2020-05-24_1_min_part_', 4]]
 
-# OUT_FILE = 'May2021_AutoSpeeds_1.csv'
-# INPUT_PATHS = [['All_SF_2021-05-02_to_2021-05-09_1_min_part_', 4]]
+# OUT_FILE = ['May2020_AutoSpeeds', '2']
+# INPUT_PATHS = [['All_SF_2020-05-24_to_2020-06-07_1_min_part_', 7]]
 
-# OUT_FILE = 'May2021_AutoSpeeds_2.csv'
-# INPUT_PATHS = [['All_SF_2021-05-09_to_2021-05-16_1_min_part_', 4]]
+# OUT_FILE = ['Jun2020_AutoSpeeds', '1']
+# INPUT_PATHS = [['All_SF_2020-06-07_to_2020-06-14_1_min_part_', 4]]
 
-# OUT_FILE = 'May2021_AutoSpeeds_3.csv'
-# INPUT_PATHS = [['All_SF_2021-05-16_to_2021-05-23_1_min_part_', 4]]
+# OUT_FILE = ['Jun2020_AutoSpeeds', '2']
+# INPUT_PATHS = [['All_SF_2020-06-14_to_2020-06-21_1_min_part_', 4]]
 
-# OUT_FILE = 'May2021_AutoSpeeds_4.csv'
-# INPUT_PATHS = [['All_SF_2021-05-23_to_2021-05-30_1_min_part_', 4]]
+# OUT_FILE = ['Jun2020_AutoSpeeds', '3']
+# INPUT_PATHS = [['All_SF_2020-06-21_to_2020-06-28_1_min_part_', 4]]
 
-# OUT_FILE = 'Jun2021_AutoSpeeds_1.csv'
-# INPUT_PATHS = [['All_SF_2021-05-30_to_2021-06-06_1_min_part_', 4]]
+# OUT_FILE = ['Jun2020_AutoSpeeds', '4']
+# INPUT_PATHS = [['All_SF_2020-06-28_to_2020-07-05_1_min_part_', 4]]
 
-OUT_FILE = ['Jun2021_AutoSpeeds', '2']
-INPUT_PATHS = [['All_SF_2021-06-06_to_2021-06-13_1_min_part_', 4]]
+# OUT_FILE = ['Jul2020_AutoSpeeds', '1']
+# INPUT_PATHS = [['All_SF_2020-07-05_to_2020-07-12_1_min_part_', 4]]
+
+# OUT_FILE = ['Jul2020_AutoSpeeds', '2']
+# INPUT_PATHS = [['All_SF_2020-07-12_to_2020-07-19_1_min_part_', 4]]
+
+# OUT_FILE = ['Jul2020_AutoSpeeds', '3']
+# INPUT_PATHS = [['All_SF_2020-07-19_to_2020-07-26_1_min_part_', 4]]
+
+# OUT_FILE = ['Jul2020_AutoSpeeds', '4']
+# INPUT_PATHS = [['All_SF_2020-07-26_to_2020-08-01_1_min_part_', 4]]
+
+# OUT_FILE = ['Aug2020_AutoSpeeds', '1']
+# INPUT_PATHS = [['All_SF_2020-08-02_to_2020-08-09_1_min_part_', 4]]
+
+# OUT_FILE = ['Aug2020_AutoSpeeds', '2']
+# INPUT_PATHS = [['All_SF_2020-08-09_to_2020-08-16_1_min_part_', 4]]
+
+# OUT_FILE = ['Aug2020_AutoSpeeds', '3']
+# INPUT_PATHS = [['All_SF_2020-08-16_to_2020-08-23_1_min_part_', 4]]
+
+# OUT_FILE = ['Aug2020_AutoSpeeds', '4']
+# INPUT_PATHS = [['All_SF_2020-08-23_to_2020-08-30_1_min_part_', 4]]
+
+# OUT_FILE = ['Sep2020_AutoSpeeds', '1']
+# INPUT_PATHS = [['All_SF_2020-08-30_to_2020-09-06_1_min_part_', 4]]
+
+# OUT_FILE = ['Sep2020_AutoSpeeds', '2']
+# INPUT_PATHS = [['All_SF_2020-09-06_to_2020-09-13_1_min_part_', 4]]
+
+OUT_FILE = ['Sep2020_AutoSpeeds', '3']
+INPUT_PATHS = [['All_SF_2020-09-13_to_2020-09-20_1_min_part_', 4]]
 
 # Sample size thresholds
 ss_threshold_peaks = 10 # Minimum sample size for the AM/PM monitoring period
