@@ -49,7 +49,4 @@ In the following, `xx0x` refers to the map release version (e.g. 2301 for map re
     5. Probably: make changes to `manual_add.csv` and `manual_remove.csv` as needed and rerun step 4.
 6. `xd_diff.ipynb` can then be used to explore the differences between the current and the last map version of the INRIX XD road network. (And probably potentially loop back to step 5.4 and 5.5 if necessary).
 7. If desired, use GIS software to visualize the results for further verification.
-
-## TODO
-- Why are we not using OSM to help do the network conflation between CHAMP/CMP networks and INRIX's?
-- Update the network conflation process to be more robust and simplify
+8. TMP: For now, note the options specified in step 5 in a TOML file, and save it in `Q:\CMP\LOS Monitoring YYYY\Network_Conflation\vxx0x\` (created in step 3).
