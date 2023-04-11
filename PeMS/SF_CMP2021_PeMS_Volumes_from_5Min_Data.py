@@ -1,12 +1,9 @@
-import sys, os, gzip, shutil
+import os
 import datetime as dt
 import pandas as pd
 import numpy as np
 import holidays
 
-#UK path
-# PEMSDIR = r'D:\PeMS'
-# OUTDIR = r'D:\PeMS'
 
 #SFCTA paths
 PEMSDIR = r'Q:\Data\Observed\Streets\PeMS\CMP'
