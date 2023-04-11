@@ -74,7 +74,7 @@ def filter_trips_by_time(trips, stop_times, begin_time: str, end_time: str, arri
     start_stops_idx = stop_times.groupby(['trip_id'])['stop_sequence'].transform(min) == stop_times['stop_sequence']
     trips_hour = pd.merge(
         trips,
-        stop_times[start_stops_idx][['trip_id', 'arrival_time', 'departure_time', 'departure_hour']],  # TODO remove departure_hour if unneeded
+        stop_times[start_stops_idx][['trip_id', 'arrival_time', 'departure_time']],
         on='trip_id', how='left'
     )
 
@@ -85,7 +85,7 @@ def filter_trips_by_time(trips, stop_times, begin_time: str, end_time: str, arri
     return trips_in_period
 
 
-def frequent_routes(trips_in_period, trips_shapes, period_cols, trips_shapes_mcv, routes, output_dir, outname, peak_period, output_tag):
+def frequent_routes(trips_in_period, trips_shapes, period_cols, trips_shapes_mcv, routes, min_trips, output_dir, outname, peak_period, output_tag):
     """TODO just grouping everything to do with frequent routes here first"""
 
     # check if routes meet the minimum period and hourly requirements
@@ -115,7 +115,7 @@ def frequent_routes(trips_in_period, trips_shapes, period_cols, trips_shapes_mcv
     return route_frequent#, route_period_counts
 
 
-def frequent_stops(stops, stop_times, route_frequent, trips_in_period, peak_period, min_trips, outname):
+def frequent_stops(stops, stop_times, route_frequent, trips_in_period, peak_period, min_trips, output_dir, outname, output_tag):
     """TODO just grouping everything to do with frequent stops here first"""
 
     # TODO this is how the .ipynb calculated stop_frequent; commented out for now:
@@ -155,7 +155,7 @@ def frequent_stops(stops, stop_times, route_frequent, trips_in_period, peak_peri
     return stop_frequent_list#, stop_period_counts
 
 
-def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname, min_trips, output_dir, output_tag, crs):
+def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname, min_trips, output_dir, output_tag, crs, COMBINE_ROUTES):
     """
     
     Parameters
@@ -194,8 +194,8 @@ def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname, min_trips, o
     trips_in_period = filter_trips_by_time(trips, stop_times, begin_time, end_time, arrival_time=True)
         
     route_frequent = frequent_routes(
-        trips_in_period, trips_shapes, period_cols, trips_shapes_mcv, routes, output_dir, outname, peak_period, output_tag)
-    stop_frequent_list = frequent_stops(stops, stop_times, route_frequent, trips_in_period, peak_period, min_trips, outname)
+        trips_in_period, trips_shapes, period_cols, trips_shapes_mcv, routes, min_trips, output_dir, outname, peak_period, output_tag)
+    stop_frequent_list = frequent_stops(stops, stop_times, route_frequent, trips_in_period, peak_period, min_trips, output_dir, outname, output_tag)
     return stop_frequent_list#, route_period_counts, stop_period_counts    
 
 
@@ -228,7 +228,7 @@ def endnotes_from_streets(streets_gdf):
     e_nodes = streets_gdf[['E_Lat', 'E_Long']]
     e_nodes.columns = ['Lat', 'Long']
 
-    streets_endnodes = b_nodes.append(e_nodes, ignore_index=True).reset_index()
+    streets_endnodes = pd.concat((b_nodes, e_nodes), ignore_index=True).reset_index()
 
     # Assign unique node id
     endnodes_cnt = streets_endnodes.groupby(['Lat', 'Long']).index.count().reset_index()
@@ -261,7 +261,7 @@ def endnotes_from_streets(streets_gdf):
     return streets_gdf, endnodes_cnt
 
 
-def build_walking_network(gtfs_dir, streets_gdf, endnodes_cnt, crs):
+def build_walking_network(gtfs_dir, streets_gdf, maz_gdf, endnodes_cnt, crs):
     stops = read_stops(gtfs_dir, crs)
     
     stops_within_sf = gpd.sjoin(stops, maz_gdf, predicate='within').reset_index()
@@ -305,7 +305,7 @@ def build_walking_network(gtfs_dir, streets_gdf, endnodes_cnt, crs):
     return stops_within_sf, stop_near_links, tgraph
 
 
-def stop_walking_area(walk_graph, walk_dis, start_node, link_near_stop):
+def stop_walking_area(streets_gdf, walk_graph, walk_dis, start_node, link_near_stop):
     cur_path = dict(nx.single_source_dijkstra_path(walk_graph, start_node, cutoff=walk_dis, weight='weight'))
     del cur_path[start_node]  # TODO definitely should not have del in production code
     reach_links = {}
@@ -327,7 +327,7 @@ def stop_walking_area(walk_graph, walk_dis, start_node, link_near_stop):
     return multi_line_polygon
 
 
-def frequent_access_area(walk_graph, stop_list, stop_with_nearest_link, buffer_radius, crs):
+def frequent_access_area(streets_gdf, walk_graph, stop_list, stop_with_nearest_link, buffer_radius, crs):
     """Accessible area from high frequent stops"""
     geometrys = []
     for cur_stop_id in stop_list:
@@ -344,12 +344,12 @@ def frequent_access_area(walk_graph, stop_list, stop_with_nearest_link, buffer_r
                             stop_with_nearest_link.loc[lidx,'near_link_eid'], 
                             weight = stop_with_nearest_link.loc[lidx, 'stop_to_end'])
 
-        geometrys.append(stop_walking_area(cur_graph, buffer_radius, cur_node_id, cur_link))
+        geometrys.append(stop_walking_area(streets_gdf, cur_graph, buffer_radius, cur_node_id, cur_link))
     stop_access_gdf = gpd.GeoDataFrame({"stop_id": stop_list, "geometry": geometrys}, crs=crs)
     return stop_access_gdf
 
 
-def frequent_stops_access_geo(frequent_stops_access_union, crs):
+def frequent_stops_access_geo(maz_gdf, geo_data, frequent_stops_access_union, crs, min_intersect_area_prop):
     frequent_stops_access_geo = gpd.overlay(maz_gdf, gpd.GeoDataFrame({'geometry':[frequent_stops_access_union]}, crs=crs))
     frequent_stops_access_geo['area_prop'] = frequent_stops_access_geo.geometry.area/frequent_stops_access_geo['Shape_Area']
     frequent_stops_access_geo = frequent_stops_access_geo[frequent_stops_access_geo['area_prop']>=min_intersect_area_prop]
@@ -376,21 +376,21 @@ def read_maz_attrs(maz_gdf, maz_ctlfile_filepath, maz_datafile_filepath, gtfs_ye
     return geo_data
 
 
-def calculate_coverage(maz_gdf, geo_data, streets_gdf, endnodes_cnt, gtfs_dir, gtfs_service_id, gtfs_year, min_trips, output_dir, output_tag):
+def calculate_coverage(maz_gdf, geo_data, streets_gdf, endnodes_cnt, gtfs_dir, gtfs_service_id, gtfs_year, min_trips, output_dir, output_tag, COMBINE_ROUTES, buffer_radius, min_intersect_area_prop, crs):
     coverage_df = pd.DataFrame()
     idx = 0
-    stops_within_sf, stop_near_links, tgraph = build_walking_network(gtfs_dir, streets_gdf, endnodes_cnt, crs)
+    stops_within_sf, stop_near_links, tgraph = build_walking_network(gtfs_dir, streets_gdf, maz_gdf, endnodes_cnt, crs)
     for peak_period in ['AM', 'PM']:
         coverage_df.loc[idx, 'year'] = int(gtfs_year)
         coverage_df.loc[idx, 'period'] = peak_period
         
-        stop_frequent_list = frequent_bus_routes(gtfs_dir, gtfs_service_id, peak_period, gtfs_year, min_trips, output_dir, output_tag, crs)
+        stop_frequent_list = frequent_bus_routes(gtfs_dir, gtfs_service_id, peak_period, gtfs_year, min_trips, output_dir, output_tag, crs, COMBINE_ROUTES)
         stop_frequent_list_with_sf = [stopid for stopid in stop_frequent_list if stopid in stops_within_sf['stop_id'].tolist()]
         if len(stop_frequent_list_with_sf)>0:
-            frequent_stops_access_area = frequent_access_area(tgraph, stop_frequent_list_with_sf, stop_near_links, buffer_radius, crs)
+            frequent_stops_access_area = frequent_access_area(streets_gdf, tgraph, stop_frequent_list_with_sf, stop_near_links, buffer_radius, crs)
             frequent_stops_access_area.to_crs(epsg=4326).to_file(os.path.join(output_dir, 'frequent_stops_' + output_tag + '_' + gtfs_year + '_' + peak_period + 'buffer.shp'))
             frequent_stops_access_union = frequent_stops_access_area.geometry.unary_union
-            frequent_access_geo_attrs, geo_ids = frequent_stops_access_geo(frequent_stops_access_union, crs)
+            frequent_access_geo_attrs, geo_ids = frequent_stops_access_geo(maz_gdf, geo_data, frequent_stops_access_union, crs, min_intersect_area_prop)
             maz_gdf.loc[maz_gdf['MAZID'].isin(geo_ids), ['MAZID','geometry']].to_crs("EPSG:4326").to_file(os.path.join(output_dir, 'coverage_' + output_tag + '_' + gtfs_year + '_' + peak_period + 'buffer.shp'))
             
             coverage_df.loc[idx, 'cover_pop'] = frequent_access_geo_attrs['pop_p'].sum()
@@ -406,16 +406,10 @@ def calculate_coverage(maz_gdf, geo_data, streets_gdf, endnodes_cnt, gtfs_dir, g
     return coverage_df
 
 
-if __name__ == "__main__":
+def transit_coverage(config):
     with open(CRS_TOML) as f:
         crs = tomlkit.parse(f.read())["CA3_ft"]  # TODO use SF instead
 
-    parser = argparse.ArgumentParser(description='Calculate transit coverage.')
-    parser.add_argument('config_filepath', help='config .ini filepath')
-    args = parser.parse_args()
-    config = configparser.ConfigParser()
-    config.read(args.config_filepath)
-  
     # GTFS directories, service ids, and years
     gtfs_dir = config['GTFS']['DIR']
     gtfs_service_id = config['GTFS']['SERVICE_ID']
@@ -448,9 +442,20 @@ if __name__ == "__main__":
                     ]
 
 
+    os.makedirs(output_dir, exist_ok=True)
+
     maz_gdf = read_maz(maz_shapefile_filepath, crs)
     geo_data = read_maz_attrs(maz_gdf, maz_ctlfile_filepath, maz_datafile_filepath, gtfs_year)
     streets_gdf = read_street_network(streets_shapefile_filepath, crs)
     streets_gdf, endnodes_cnt = endnotes_from_streets(streets_gdf)
-    coverage_df = calculate_coverage(maz_gdf, geo_data, streets_gdf, endnodes_cnt, gtfs_dir, gtfs_service_id, gtfs_year, min_trips, output_dir, output_tag)
+    coverage_df = calculate_coverage(maz_gdf, geo_data, streets_gdf, endnodes_cnt, gtfs_dir, gtfs_service_id, gtfs_year, min_trips, output_dir, output_tag, COMBINE_ROUTES, buffer_radius, min_intersect_area_prop, crs)
     coverage_df.to_csv(os.path.join(output_dir, f'cmp_transit_coverage_metrics_{gtfs_year}.csv'), index=False)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Calculate transit coverage.')
+    parser.add_argument('config_filepath', help='config .ini filepath')
+    args = parser.parse_args()
+    config = configparser.ConfigParser()
+    config.read(args.config_filepath)
+    transit_coverage(config)
