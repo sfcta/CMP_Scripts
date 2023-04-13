@@ -20,7 +20,7 @@ Scripts related INRIX XD road network segments are located in `INRIX/xd_segments
 - map data can be downloaded at https://map-data-downloader.inrix.com/
 
 ### Network conflation process
-The INRIX XD road network segments are matched to CMP road segments via a network conflation process. The initial network conflation process is recorded in `Q:\CMP\LOS Monitoring 2019\Network_Conflation\Network Conflation Process Memo.docx`
+The INRIX XD road network segments are matched to CMP road segments via a network conflation process. The initial network conflation process is recorded in `Q:\CMP\LOS Monitoring 2019\Network_Conflation\Network Conflation Process Memo.docx`. The TRB paper and presentation are at `O:\Presentations, Conferences, Training, Awards\Conferences, Awards\TRB\2021\Annual Meeting\CMP Pipeline`. Also some scripts in `Q:\Model Projects\101_280\notebooks\Validation`. One of them, `compare_correspondences.ipynb`, is meant to assess the quality of alternative corresonponce files.
 
 ### Updating network conflation after each INRIX map version update
 Also reference "XD - Map Update - Best Practices for Map Matching.docx" on the Documents section of https://map-data-downloader.inrix.com/
@@ -50,3 +50,4 @@ In the following, `xx0x` refers to the map release version (e.g. 2301 for map re
 6. `xd_diff.ipynb` can then be used to explore the differences between the current and the last map version of the INRIX XD road network. (And probably potentially loop back to step 5.4 and 5.5 if necessary).
 7. If desired, use GIS software to visualize the results for further verification.
 8. TMP: For now, note the options specified in step 5 in a TOML file, and save it in `Q:\CMP\LOS Monitoring YYYY\Network_Conflation\vxx0x\` (created in step 3).
+9. For network conflation with the monthly COVID tracker network (i.e. not the CMP network as in reports) rename/add "-expandednetwork.csv" at the end of the two correspondence files (one "Manual" one not).
