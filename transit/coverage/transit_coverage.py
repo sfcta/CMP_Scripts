@@ -10,6 +10,8 @@ import tomlkit  # can be replaced by tomllib (native in python after py3.11)
 
 
 CRS_TOML = "crs.toml"
+COUNTIES_BOUNDARIES_GIS_FILEPATH = "Q:\GIS\Boundaries\Counties\Counties.shp"
+COUNTIES_BOUNDARIES_GIS_CRS = "EPSG:2227"
 
 
 def read_stops(gtfs_dir, to_crs):
@@ -108,7 +110,7 @@ def frequent_routes(trips_in_period, trips_shapes, period_cols, trips_shapes_mcv
         route_frequent_shapes = route_frequent.merge(trips_shapes_mcv, on=period_cols, how='left')
         route_frequent_shapes = trips_shapes.merge(route_frequent_shapes, on='shape_id')
         route_frequent_shapes = route_frequent_shapes.merge(routes, on='route_id', how='left')
-        route_frequent_shapes.to_file(os.path.join(output_dir, 'frequent_routes_' + output_tag + '_' + outname + '_' + peak_period + '.shp'))
+        route_frequent_shapes.to_file(os.path.join(output_dir, 'frequent_routes_' + output_tag + '_' + outname + '_' + peak_period + '.gpkg'))
     else:
         print(f'No frequent routes found for {outname} {peak_period}')
 
@@ -148,14 +150,14 @@ def frequent_stops(stops, stop_times, route_frequent, trips_in_period, peak_peri
     if len(stop_frequent):  # if len > 0
         stop_frequent_list = stop_frequent.stop_id.unique().tolist()
         stop_frequent_gdf = stops[stops['stop_id'].isin(stop_frequent_list)]
-        stop_frequent_gdf.to_file(os.path.join(output_dir, 'frequent_stops_' + output_tag + '_' + outname + '_' + peak_period + '.shp'))
+        stop_frequent_gdf.to_file(os.path.join(output_dir, 'frequent_stops_' + output_tag + '_' + outname + '_' + peak_period + '.gpkg'))
     else:
-        print('No frequent stops found for %s %s' % (outname, peak_period))
+        print(f'No frequent stops found for {outname}, {peak_period}')
         stop_frequent_list = []
     return stop_frequent_list#, stop_period_counts
 
 
-def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname, min_trips, output_dir, output_tag, crs, COMBINE_ROUTES):
+def frequent_bus_routes(gtfs_dir, stops, service_id, peak_period, outname, min_trips, output_dir, output_tag, COMBINE_ROUTES):
     """
     
     Parameters
@@ -173,7 +175,6 @@ def frequent_bus_routes(gtfs_dir, service_id, peak_period, outname, min_trips, o
         print('peak_period needs to be either AM or PM')
 
     routes = read_routes(gtfs_dir)
-    stops = read_stops(gtfs_dir, crs)
     trips, trips_shapes = read_shapes(gtfs_dir, service_id)
     stop_times = read_stop_times(gtfs_dir)
 
@@ -204,6 +205,11 @@ def read_maz(maz_shapefile_filepath, to_crs):
     maz_gdf = maz_gdf[maz_gdf['COUNTY'] == 1]  # filter for SF
     maz_gdf = maz_gdf.to_crs(to_crs)
     return maz_gdf
+
+
+def read_sf_boundary(counties_boundaries_gis_filepath, crs):
+    gdf = gpd.read_file(counties_boundaries_gis_filepath).set_crs(crs)
+    return gdf[gdf["COUNTY"] == 1]
 
 
 def read_street_network(streets_shapefile_filepath, to_crs):
@@ -241,7 +247,7 @@ def endnotes_from_streets(streets_gdf):
     # endnodes_cnt['geometry'] = endnodes_cnt['geometry'].apply(Point)
     # endnodes_unique_gpd = gpd.GeoDataFrame(endnodes_cnt, geometry='geometry')
     # endnodes_unique_gpd.crs = CRS
-    # endnodes_unique_gpd.to_file(os.path.join(Streets_Dir, 'streets_endnodes.shp'))
+    # endnodes_unique_gpd.to_file(os.path.join(Streets_Dir, 'streets_endnodes.gpkg'))
 
     endnodes_cnt = endnodes_cnt[['Lat', 'Long', 'NodeCnt', 'NodeID']]
     endnodes_cnt.columns = ['B_Lat', 'B_Long', 'B_NodeCnt', 'B_NodeID']
@@ -256,15 +262,13 @@ def endnotes_from_streets(streets_gdf):
     streets_gdf['e_b'] = list(zip(streets_gdf['E_NodeID'], streets_gdf['B_NodeID']))
     # Save the updated street shapefile with endnodes
     # outcols = [c for c in streets.columns.tolist() if c not in ['b_e', 'e_b']]
-    # streets[outcols].to_file(os.path.join(Streets_Dir, 'streets_with_endnodes.shp'))
+    # streets[outcols].to_file(os.path.join(Streets_Dir, 'streets_with_endnodes.gpkg'))
 
     return streets_gdf, endnodes_cnt
 
 
-def build_walking_network(gtfs_dir, streets_gdf, maz_gdf, endnodes_cnt, crs):
-    stops = read_stops(gtfs_dir, crs)
-    
-    stops_within_sf = gpd.sjoin(stops, maz_gdf, predicate='within').reset_index()
+def build_walking_network(stops, streets_gdf, sf_boundary_gdf, endnodes_cnt):
+    stops_within_sf = stops.sjoin(sf_boundary_gdf, predicate='within').reset_index()
     stops_within_sf = stops_within_sf[stops.columns]
     stops_within_sf.insert(0, 'NodeID', range(endnodes_cnt['NodeID'].max() + 1, endnodes_cnt['NodeID'].max() + 1 + len(stops_within_sf)))  # TODO no need to create a separate NodeID, just use the index itself
     
@@ -327,11 +331,11 @@ def stop_walking_area(streets_gdf, walk_graph, walk_dis, start_node, link_near_s
     return multi_line_polygon
 
 
-def frequent_access_area(streets_gdf, walk_graph, stop_list, stop_with_nearest_link, buffer_radius, crs):
+def frequent_access_area(streets_gdf, walk_graph, stop_ids, stop_with_nearest_link, buffer_radius, crs):
     """Accessible area from high frequent stops"""
     geometrys = []
-    for cur_stop_id in stop_list:
-        lidx = stop_with_nearest_link.index[stop_with_nearest_link['stop_id']==cur_stop_id][0]
+    for stop_id in stop_ids:
+        lidx = stop_with_nearest_link.index[stop_with_nearest_link['stop_id']==stop_id][0]
         cur_node_id = stop_with_nearest_link.loc[lidx, 'NodeID']
         cur_link = stop_with_nearest_link.loc[lidx, 'near_link']
 
@@ -345,7 +349,7 @@ def frequent_access_area(streets_gdf, walk_graph, stop_list, stop_with_nearest_l
                             weight = stop_with_nearest_link.loc[lidx, 'stop_to_end'])
 
         geometrys.append(stop_walking_area(streets_gdf, cur_graph, buffer_radius, cur_node_id, cur_link))
-    stop_access_gdf = gpd.GeoDataFrame({"stop_id": stop_list, "geometry": geometrys}, crs=crs)
+    stop_access_gdf = gpd.GeoDataFrame({"stop_id": stop_ids, "geometry": geometrys}, crs=crs)
     return stop_access_gdf
 
 
@@ -377,21 +381,26 @@ def read_maz_attrs(maz_gdf, maz_ctlfile_filepath, maz_datafile_filepath, gtfs_ye
 
 
 def calculate_coverage(maz_gdf, geo_data, streets_gdf, endnodes_cnt, gtfs_dir, gtfs_service_id, gtfs_year, min_trips, output_dir, output_tag, COMBINE_ROUTES, buffer_radius, min_intersect_area_prop, crs):
+    stops = read_stops(gtfs_dir, crs)
+    sf_boundary_gdf = read_sf_boundary(
+        COUNTIES_BOUNDARIES_GIS_FILEPATH,
+        COUNTIES_BOUNDARIES_GIS_CRS
+    )
     coverage_df = pd.DataFrame()
     idx = 0
-    stops_within_sf, stop_near_links, tgraph = build_walking_network(gtfs_dir, streets_gdf, maz_gdf, endnodes_cnt, crs)
+    stops_within_sf, stop_near_links, tgraph = build_walking_network(stops, streets_gdf, sf_boundary_gdf, endnodes_cnt)
     for peak_period in ['AM', 'PM']:
         coverage_df.loc[idx, 'year'] = int(gtfs_year)
         coverage_df.loc[idx, 'period'] = peak_period
         
-        stop_frequent_list = frequent_bus_routes(gtfs_dir, gtfs_service_id, peak_period, gtfs_year, min_trips, output_dir, output_tag, crs, COMBINE_ROUTES)
+        stop_frequent_list = frequent_bus_routes(gtfs_dir, stops, gtfs_service_id, peak_period, gtfs_year, min_trips, output_dir, output_tag, COMBINE_ROUTES)
         stop_frequent_list_with_sf = [stopid for stopid in stop_frequent_list if stopid in stops_within_sf['stop_id'].tolist()]
         if len(stop_frequent_list_with_sf)>0:
             frequent_stops_access_area = frequent_access_area(streets_gdf, tgraph, stop_frequent_list_with_sf, stop_near_links, buffer_radius, crs)
-            frequent_stops_access_area.to_crs(epsg=4326).to_file(os.path.join(output_dir, 'frequent_stops_' + output_tag + '_' + gtfs_year + '_' + peak_period + 'buffer.shp'))
+            frequent_stops_access_area.to_crs(epsg=4326).to_file(os.path.join(output_dir, 'frequent_stops_' + output_tag + '_' + gtfs_year + '_' + peak_period + 'buffer.gpkg'))
             frequent_stops_access_union = frequent_stops_access_area.geometry.unary_union
             frequent_access_geo_attrs, geo_ids = frequent_stops_access_geo(maz_gdf, geo_data, frequent_stops_access_union, crs, min_intersect_area_prop)
-            maz_gdf.loc[maz_gdf['MAZID'].isin(geo_ids), ['MAZID','geometry']].to_crs("EPSG:4326").to_file(os.path.join(output_dir, 'coverage_' + output_tag + '_' + gtfs_year + '_' + peak_period + 'buffer.shp'))
+            maz_gdf.loc[maz_gdf['MAZID'].isin(geo_ids), ['MAZID','geometry']].to_crs("EPSG:4326").to_file(os.path.join(output_dir, 'coverage_' + output_tag + '_' + gtfs_year + '_' + peak_period + 'buffer.gpkg'))
             
             coverage_df.loc[idx, 'cover_pop'] = frequent_access_geo_attrs['pop_p'].sum()
             coverage_df.loc[idx, 'cover_jobs'] = frequent_access_geo_attrs['emptot_p'].sum()
@@ -408,7 +417,8 @@ def calculate_coverage(maz_gdf, geo_data, streets_gdf, endnodes_cnt, gtfs_dir, g
 
 def transit_coverage(config):
     with open(CRS_TOML) as f:
-        crs = tomlkit.parse(f.read())["CA3_ft"]  # TODO use SF instead
+        # TODO use SF instead? Though SFCTA generally uses CA3_ft.
+        crs = tomlkit.parse(f.read())["CA3_ft"]
 
     # GTFS directories, service ids, and years
     gtfs_dir = config['GTFS']['DIR']
