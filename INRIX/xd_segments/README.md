@@ -17,6 +17,7 @@ Scripts related INRIX XD road network segments are located in `INRIX/xd_segments
 
 ## INRIX Map Version updates
 - INRIX updates their map version twice a year, in March and September
+- 'we roll up all XD data to the most current map. This means that all data within your downloads is on our current map. However, if you were to wait to download this data until our next map update you would find that all of the data would be on the that map.  This means that it DOES matter when you download the data because it will have slightly different segmentation. There is typically at 5-10% difference in segmentation.'
 - map data can be downloaded at https://map-data-downloader.inrix.com/
 
 ### Network conflation process
