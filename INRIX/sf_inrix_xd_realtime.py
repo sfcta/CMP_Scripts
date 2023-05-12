@@ -1,25 +1,30 @@
+from glob import glob
+from pprint import pprint
+import re
 import pandas as pd
 import numpy as np
 import geopandas as gp
 import dask.dataframe as dd
 import os
 
+from zipfile import ZipFile
+
 NETCONF_DIR = r'Q:\CMP\LOS Monitoring 2023\Network_Conflation\v2301'
 CORR_FILE = r'CMP_Segment_INRIX_Links_Correspondence_2301_Manual-expandednetwork.csv'
 CMP_SHP = os.path.join(r'Q:\CMP\LOS Monitoring 2022\CMP_exp_shp', 'cmp_segments_exp_v2201.shp')
-DATA_DIR = r'Q:\Data\Observed\Streets\INRIX\v2301\202303'
+DATA_DIR = r'Q:\Data\Observed\Streets\INRIX\v2301'
 OUT_DIR = r'Q:\CMP\Congestion_Tracker\viz_data\v2301'
 YEAR=2023
 
-OUT_FILES = [['202303_AutoSpeeds', str(i)] for i in range(1, 6)]
-INPUT_PATHSS = [
-    [['All_SF_2023-03-01_to_2023-03-05_1_min_part_', 2]],
-    [['All_SF_2023-03-05_to_2023-03-12_1_min_part_', 4]],
-    [['All_SF_2023-03-12_to_2023-03-19_1_min_part_', 4]],
-    [['All_SF_2023-03-19_to_2023-03-26_1_min_part_', 4]],
-    [['All_SF_2023-03-26_to_2023-04-01_1_min_part_', 3]]
-]
+# OUT_FILES = ['202303_AutoSpeeds']
+# INPUT_GLOBS = [
+#     r'2023\03\sf_2023-03-01_to_2023-04-01_1_min_part_*.zip'
+# ]
 
+OUT_FILES = ['202304_AutoSpeeds']
+INPUT_GLOBS = [
+    r'2023\04\sf_2023-04-01_to_2023-05-01_1_min_part_*.zip'
+]
 
 # Define processing functions
 # LOS function using 1985 HCM
@@ -217,8 +222,23 @@ def cmp_seg_level_speed_and_los(df_cmp_period, ss_threshold, cur_year, cur_perio
     return cmp_period_agg
 
 
+def _dirs_in_zip(zip_filepath: str) -> set:
+    with ZipFile(zip_filepath, "r") as z:
+        return set([os.path.dirname(f) for f in z.namelist()])
+
+
+def _zip_hashdir(zip_filepath: str) -> str:
+    dirs = _dirs_in_zip(zip_filepath)
+    if len(dirs) > 1:
+        raise RuntimeError(
+            f"Multiple directories found inside {zip_filepath}. There should "
+            "only be one directory inside the zip files downloaded from INRIX."
+        )
+    return next(iter(dirs))  # return the next/only item in dirs
+
+            
 if __name__ == "__main__":
-    for OUT_FILE, INPUT_PATHS in zip(OUT_FILES, INPUT_PATHSS):
+    for OUT_FILE, INPUT_GLOB in zip(OUT_FILES, INPUT_GLOBS):
 
         # Sample size thresholds
         ss_threshold_peaks = 10 # Minimum sample size for the AM/PM monitoring period
@@ -234,21 +254,23 @@ if __name__ == "__main__":
         conf_len.columns = ['CMP_SegID', 'CMP_Length']
 
         # Read in the INRIX data using dask to save memory
-        df_cmp = pd.DataFrame()
-        for p in INPUT_PATHS:
-            for i in range(1, p[1]):
-                print(f'Reading path {i}')
-                zip_name = f"{p[0]}{i}"
-                zip_filepath = os.path.join(DATA_DIR, f"{zip_name}.zip")
-                # with zipfile.ZipFile(os.path.join(DATA_DIR, f"{zip_dir_name}.zip")) as z:
-                #     with z.open(f"{zip_dir_name}/data.csv") as f:
-                #         df1 = dd.read_csv(f, assume_missing=True)
-                # handled through fsspec
-                df1 = dd.read_csv(f"zip://{zip_name}/data.csv::file://{zip_filepath}", assume_missing=True)
-                if len(df1)>0:
-                    df1['Segment ID'] = df1['Segment ID'].astype('int')
-                    df1 = df1[df1['Segment ID'].isin(conflation['INRIX_SegID'])]
-                    df_cmp = dd.concat([df_cmp,df1],axis=0,interleave_partitions=True)
+        zip_filepaths = sorted(
+            glob(os.path.join(DATA_DIR, INPUT_GLOB)),
+            # natural sort of part numbers
+            key=lambda f: [int(x) for x in re.findall(r'\d+', f)]
+        )
+        print("inputs files:")
+        pprint(zip_filepaths)
+        input_dfs = []
+        for zip_filepath in zip_filepaths:
+            print(f'Reading input file {zip_filepath}...')
+            # read_csv of zip handled through fsspec
+            input_df = dd.read_csv(f"zip://{_zip_hashdir(zip_filepath)}/data.csv::file://{zip_filepath}", assume_missing=True)
+            if len(input_df):  # if > 0
+                input_df['Segment ID'] = input_df['Segment ID'].astype('int')
+                input_df = input_df[input_df['Segment ID'].isin(conflation['INRIX_SegID'])]
+                input_dfs.append(input_df)
+        df_cmp = dd.concat(input_dfs, axis=0, interleave_partitions=True)
 
         df_cmp['Segment ID'] = df_cmp['Segment ID'].astype('int')
 
@@ -283,26 +305,25 @@ if __name__ == "__main__":
 
         print('Processing hourly & AM/PM periods...')
 
-        cmp_segs_los = pd.DataFrame()
+        cmp_segs_los_dfs = []
 
         # Hourly
         for hour in range(24):
             print(f'Hour = {hour}')
             subset = df_cmp[(df_cmp['Hour']==hour)]
-            tmp = cmp_seg_level_speed_and_los(subset, ss_threshold_hourly, cur_year=YEAR, cur_period=hour)
-            cmp_segs_los = cmp_segs_los.append(tmp, ignore_index=True)
+            cmp_segs_los_dfs.append(cmp_seg_level_speed_and_los(subset, ss_threshold_hourly, cur_year=YEAR, cur_period=hour))
 
         # AM (7-9am)
         print('AM Period')
         subset = df_cmp[(df_cmp['Hour']==7) | (df_cmp['Hour']==8)]
-        tmp = cmp_seg_level_speed_and_los(subset, ss_threshold_peaks, cur_year=YEAR, cur_period='AM')
-        cmp_segs_los = cmp_segs_los.append(tmp, ignore_index=True)
+        cmp_segs_los_dfs.append(cmp_seg_level_speed_and_los(subset, ss_threshold_peaks, cur_year=YEAR, cur_period='AM'))
 
         # PM (4:30-6:30pm)
         print('PM Period')
         subset = df_cmp[((df_cmp['Hour']==16) & (df_cmp['Minute']>=30)) | (df_cmp['Hour']==17) | ((df_cmp['Hour']==18) & (df_cmp['Minute']<30))]
-        tmp = cmp_seg_level_speed_and_los(subset, ss_threshold_peaks, cur_year=YEAR, cur_period='PM')
-        cmp_segs_los = cmp_segs_los.append(tmp, ignore_index=True)
+        cmp_segs_los_dfs.append(cmp_seg_level_speed_and_los(subset, ss_threshold_peaks, cur_year=YEAR, cur_period='PM'))
+
+        cmp_segs_los = pd.concat(cmp_segs_los_dfs, ignore_index=True)
 
         print('Finished processing periods.')
 
@@ -316,5 +337,5 @@ if __name__ == "__main__":
         peaks = cmp_segs_los[cmp_segs_los['period'].isin(['AM','PM'])]
         hourly = cmp_segs_los[~cmp_segs_los['period'].isin(['AM','PM'])]
         hourly.rename(columns={'period':'hour'}, inplace=True)
-        hourly.to_csv(os.path.join(OUT_DIR, OUT_FILE[0] + '_Hourly_' + OUT_FILE[1] + '.csv' ), index=False)
-        peaks.to_csv(os.path.join(OUT_DIR, OUT_FILE[0] + '_AMPM_'+ OUT_FILE[1] + '.csv' ), index=False)
+        hourly.to_csv(os.path.join(OUT_DIR, OUT_FILE + '_Hourly' + '.csv' ), index=False)
+        peaks.to_csv(os.path.join(OUT_DIR, OUT_FILE + '_AMPM'+ '.csv' ), index=False)
