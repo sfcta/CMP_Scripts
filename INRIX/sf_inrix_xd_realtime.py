@@ -21,9 +21,14 @@ YEAR=2023
 #     r'2023\03\sf_2023-03-01_to_2023-04-01_1_min_part_*.zip'
 # ]
 
-OUT_FILES = ['202304_AutoSpeeds']
+# OUT_FILES = ['202304_AutoSpeeds']
+# INPUT_GLOBS = [
+#     r'2023\04\sf_2023-04-01_to_2023-05-01_1_min_part_*.zip'
+# ]
+
+OUT_FILES = ['202305_AutoSpeeds']
 INPUT_GLOBS = [
-    r'2023\04\sf_2023-04-01_to_2023-05-01_1_min_part_*.zip'
+    r'2023\05\sf_2023-05-01_to_2023-06-01_1_min_part_*.zip'
 ]
 
 # Define processing functions
@@ -152,8 +157,12 @@ def percentile(n):
     percentile_.__name__ = 'percentile_%s' % n
     return percentile_
 
+
 # Calculate CMP segment level average speeds and LOS
 def spatial_coverage(df, cmp_period_agg, group_cols, rename_cols, ss_threshold, coverage_threshold):
+    # select the segment IDs that are not in cmp_period_agg yet (i.e. not
+    # covered by all the previous coverage thresholds yet), but that are covered
+    # under the current coverage threshold
     select = (~df['CMP_SegID'].isin(cmp_period_agg['cmp_segid'])) & (df['SpatialCov']>=coverage_threshold)
     cmp_tt_agg = pd.DataFrame()
     if select.sum() > 0:
@@ -167,9 +176,12 @@ def spatial_coverage(df, cmp_period_agg, group_cols, rename_cols, ss_threshold, 
     
     if len(cmp_tt_agg)>0:
         cmp_tt_agg['comment'] = 'Calculation performed on ' + str(coverage_threshold) +'% or greater of length'
-        cmp_period_agg = cmp_period_agg.append(cmp_tt_agg, ignore_index=True)
-        
-    return cmp_period_agg
+        return cmp_tt_agg
+    else:
+        # might be better to return an empty DataFrame?
+        # A maybe monad would've been useful
+        return None
+
 
 # Calculate CMP segment level average speeds, LOS, and reliability metrics
 def cmp_seg_level_speed_and_los(df_cmp_period, ss_threshold, cur_year, cur_period):
@@ -185,28 +197,13 @@ def cmp_seg_level_speed_and_los(df_cmp_period, ss_threshold, cur_year, cur_perio
     
     group_cols = ['CMP_SegID','Date']
     rename_cols = ['cmp_segid', 'date', 'sample_size', 'TT', 'Len', 'std_speed', 'pcnt5th', 'pcnt20th']
+
+    coverage_thresholds = [99, 95, 90, 85, 80, 75, 70]
     cmp_period_agg = pd.DataFrame(columns = rename_cols)
-    
-    # 99% spatial coverage 
-    cmp_period_agg = spatial_coverage(cmp_period, cmp_period_agg, group_cols, rename_cols, ss_threshold, coverage_threshold = 99)
-    
-    # 95% spatial coverage 
-    cmp_period_agg = spatial_coverage(cmp_period, cmp_period_agg, group_cols, rename_cols, ss_threshold, coverage_threshold = 95)
-
-    # 90% spatial coverage 
-    cmp_period_agg = spatial_coverage(cmp_period, cmp_period_agg, group_cols, rename_cols, ss_threshold, coverage_threshold = 90)
-
-    # 85% spatial coverage 
-    cmp_period_agg = spatial_coverage(cmp_period, cmp_period_agg, group_cols, rename_cols, ss_threshold, coverage_threshold = 85)
-
-    # 80% spatial coverage 
-    cmp_period_agg = spatial_coverage(cmp_period, cmp_period_agg, group_cols, rename_cols, ss_threshold, coverage_threshold = 80)
-
-    # 75% spatial coverage 
-    cmp_period_agg = spatial_coverage(cmp_period, cmp_period_agg, group_cols, rename_cols, ss_threshold, coverage_threshold = 75)
-
-    # 70% spatial coverage 
-    cmp_period_agg = spatial_coverage(cmp_period, cmp_period_agg, group_cols, rename_cols, ss_threshold, coverage_threshold = 70)
+    for coverage_threshold in coverage_thresholds:
+        coverage = spatial_coverage(cmp_period, cmp_period_agg, group_cols, rename_cols, ss_threshold, coverage_threshold)
+        if coverage is not None:
+            pd.concat((cmp_period_agg, coverage), ignore_index=True)
 
     cmp_period_agg['year'] = cur_year
     cmp_period_agg['period'] = cur_period
