@@ -4,5 +4,5 @@
 #   "Q:\Data\Observed\Streets\Counts\CMP\2021\intersection\parsed-intersection-totals.csv"
 # python parse_intersection_totals.py `
 #   "Q:\Data\Observed\Streets\Counts\CMP\2023\intersection\2023 SFCTA AM TMC Count Results (SFCTA) April May 2023.xlsx" `
-#   "Q:\Data\Observed\Streets\Counts\CMP\2023\intersection\2023 SFCTA AM TMC Count Results (SFCTA) April May 2023.xlsx" `
+#   "Q:\Data\Observed\Streets\Counts\CMP\2023\intersection\2023 SFCTA PM TMC Count Results (SFCTA) April May 2023.xlsx" `
 #   "Q:\Data\Observed\Streets\Counts\CMP\2023\intersection\parsed-intersection-totals.csv"
