@@ -1,3 +1,4 @@
+import argparse
 import os
 import re
 from glob import glob
@@ -9,31 +10,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import polars as pl
-
-
-NETCONF_DIR = r"Q:\CMP\LOS Monitoring 2023\Network_Conflation\v2301"
-CORR_FILE = (
-    r"CMP_Segment_INRIX_Links_Correspondence_2301_Manual-expandednetwork.csv"
-)
-CMP_SHP = Path(
-    r"Q:\CMP\LOS Monitoring 2022\CMP_exp_shp", "cmp_segments_exp_v2201.shp"
-)
-DATA_DIR = r"Q:\Data\Observed\Streets\INRIX\v2301"
-OUT_DIR = r"Q:\CMP\Congestion_Tracker\viz_data\v2301"
-YEAR = 2023
-
-# OUT_FILES = ['202303_AutoSpeeds']
-# INPUT_GLOBS = [
-#     r'2023\03\sf_2023-03-01_to_2023-04-01_1_min_part_*.zip'
-# ]
-
-# OUT_FILES = ['202304_AutoSpeeds']
-# INPUT_GLOBS = [
-#     r'2023\04\sf_2023-04-01_to_2023-05-01_1_min_part_*.zip'
-# ]
-
-OUT_FILES = ["202305_AutoSpeeds"]
-INPUT_GLOBS = [r"2023\05\sf_2023-05-01_to_2023-06-01_1_min_part_*.zip"]
+import tomllib
 
 
 # Define processing functions
@@ -323,187 +300,197 @@ def _zip_hashdir(zip_filepath: str) -> str:
 
 
 if __name__ == "__main__":
-    for OUT_FILE, INPUT_GLOB in zip(OUT_FILES, INPUT_GLOBS):
-        # Sample size thresholds
-        ss_threshold_peaks = (
-            10  # Minimum sample size for the AM/PM monitoring period
-        )
-        ss_threshold_hourly = 10  # Miniumum sample size for hourly
+    parser = argparse.ArgumentParser()
+    parser.add_argument("toml_filepath")
+    args = parser.parse_args()
 
-        # Get CMP and INRIX correspondence table
-        conflation = pl.read_csv(Path(NETCONF_DIR, CORR_FILE))
-        conf_len = conflation.groupby("CMP_SegID").agg(
-            pl.sum("Length_Matched").alias("CMP_Length")
-        )
+    with open(args.toml_filepath, "rb") as f:
+        config = tomllib.load(f)
 
-        # Read in the INRIX data using dask to save memory
-        zip_filepaths = sorted(
-            glob(os.path.join(DATA_DIR, INPUT_GLOB)),
-            # natural sort of part numbers
-            key=lambda f: [int(x) for x in re.findall(r"\d+", f)],
-        )
-        print("inputs files:")
-        pprint(zip_filepaths)
-        input_dfs = []
-        for zip_filepath in zip_filepaths:
-            print(f"Reading input file {zip_filepath}...")
-            # fsspec filepath (e.g. for dask):
-            # (
-            #     f"zip://{_zip_hashdir(zip_filepath)}/data.csv"
-            #     "::file://{zip_filepath}"
-            # )
-            # seems like polars cannot handle reading zip CSVs via fsspec
-            with ZipFile(zip_filepath) as z:
-                with z.open(
-                    f"{_zip_hashdir(zip_filepath)}/data.csv", mode="r"
-                ) as f:
-                    input_df = pl.read_csv(
-                        f.read(),
-                        dtypes={
-                            "Hist Av Speed(miles/hour)": pl.Int64,
-                            "CValue": pl.Float64,
-                        },
-                    )
-            if len(input_df):  # if > 0
-                input_df = input_df.filter(
-                    input_df["Segment ID"].is_in(conflation["INRIX_SegID"])
+    # Sample size thresholds
+    ss_threshold_peaks = (
+        10  # Minimum sample size for the AM/PM monitoring period
+    )
+    ss_threshold_hourly = 10  # Miniumum sample size for hourly
+
+    # Get CMP and INRIX correspondence table
+    conflation = pl.read_csv(
+        Path(config["geo"]["network_conflation_correspondence_filepath"])
+    )
+    conf_len = conflation.groupby("CMP_SegID").agg(
+        pl.sum("Length_Matched").alias("CMP_Length")
+    )
+
+    # Read in the INRIX data using dask to save memory
+    zip_filepaths = sorted(
+        Path(config["input"]["dir"]).glob(config["input"]["glob"]),
+        # natural sort of part numbers
+        key=lambda f: [int(x) for x in re.findall(r"\d+", f.stem)],
+    )
+    print("inputs files:")
+    pprint(zip_filepaths)
+    input_dfs = []
+    for zip_filepath in zip_filepaths:
+        print(f"Reading input file {zip_filepath}...")
+        # fsspec filepath (e.g. for dask):
+        # (
+        #     f"zip://{_zip_hashdir(zip_filepath)}/data.csv"
+        #     "::file://{zip_filepath}"
+        # )
+        # seems like polars cannot handle reading zip CSVs via fsspec
+        with ZipFile(zip_filepath) as z:
+            with z.open(
+                f"{_zip_hashdir(zip_filepath)}/data.csv", mode="r"
+            ) as f:
+                input_df = pl.read_csv(
+                    f.read(),
+                    dtypes={
+                        "Hist Av Speed(miles/hour)": pl.Int64,
+                        "CValue": pl.Float64,
+                    },
                 )
-                input_dfs.append(input_df)
-        cmp_df = pl.concat(input_dfs, how="vertical", rechunk=False)
+        if len(input_df):  # if > 0
+            input_df = input_df.filter(
+                input_df["Segment ID"].is_in(conflation["INRIX_SegID"])
+            )
+            input_dfs.append(input_df)
+    cmp_df = pl.concat(input_dfs, how="vertical", rechunk=False)
 
-        # Calculate reference speed for CMP segments
-        inrix_link_refspd = cmp_df.unique(
-            subset=["Segment ID", "Ref Speed(miles/hour)"]
-        )
-        cmp_segs_refspd = (
-            conflation.join(
-                inrix_link_refspd.select(
-                    ["Segment ID", "Ref Speed(miles/hour)"]
-                ),
-                left_on="INRIX_SegID",
-                right_on="Segment ID",
-                how="left",
-            )
-            .drop_nulls(subset="Ref Speed(miles/hour)")
-            .with_columns(
-                (
-                    pl.col("Length_Matched") / pl.col("Ref Speed(miles/hour)")
-                ).alias("RefTT"),
-            )
-            # at this point, turn from link-based to segment-based
-            .groupby("CMP_SegID")
-            .agg(pl.sum("Length_Matched"), pl.sum("RefTT"))
-            .with_columns(
-                (pl.col("Length_Matched") / pl.col("RefTT")).alias(
-                    "refspd_inrix"
-                )
-            )
-            .rename({"CMP_SegID": "cmp_segid"})
-        )
-
-        # Create date and time fields for subsequent filtering
-        cmp_df = (
-            cmp_df.with_columns(
-                pl.col("Date Time")
-                .str.slice(0, 16)
-                .str.replace("T", " ")
-                .alias("Date_Time")
-            )
-            .with_columns(
-                pl.col("Date_Time").str.slice(0, 10).alias("Date"),
-                pl.col("Date_Time").str.to_datetime().alias("Day"),
-            )
-            .with_columns(
-                pl.col("Day").dt.weekday().alias("DOW"),  # Tue=2, Wed=3, Thu=4
-                pl.col("Day").dt.hour().alias("Hour"),
-                pl.col("Day").dt.minute().alias("Minute"),
-            )
-            # remove weekends & 0 speed
-            .filter((pl.col("DOW") <= 5) & (pl.col("Speed(miles/hour)") > 0))
-            .join(  # Get inrix_segid : cmp_segid mapping
-                conflation,
-                left_on="Segment ID",
-                right_on="INRIX_SegID",
-                how="outer",
-            )
-        )
-
-        print("Processing hourly & AM/PM periods...")
-
-        cmp_segs = gpd.read_file(CMP_SHP)  # CMP segment shapefile
-        cmp_segs_los_dfs = []
-
-        # Hourly
-        for hour in range(24):
-            print(f"Hour = {hour}")
-            cmp_segs_los_dfs.append(
-                cmp_seg_level_speed_and_los(
-                    cmp_segs,
-                    conf_len,
-                    cmp_df.filter(pl.col("Hour") == hour),
-                    ss_threshold_hourly,
-                    cur_year=YEAR,
-                    cur_period=hour,
-                )
-            )
-
-        # AM (7-9am)
-        print("AM Period")
-        cmp_segs_los_dfs.append(
-            cmp_seg_level_speed_and_los(
-                cmp_segs,
-                conf_len,
-                cmp_df.filter((pl.col("Hour") == 7) | (pl.col("Hour") == 8)),
-                ss_threshold_peaks,
-                cur_year=YEAR,
-                cur_period="AM",
-            )
-        )
-
-        # PM (4:30-6:30pm)
-        print("PM Period")
-        subset = cmp_df.filter(
-            ((pl.col("Hour") == 16) & (pl.col("Minute") >= 30))
-            | (pl.col("Hour") == 17)
-            | ((pl.col("Hour") == 18) & (pl.col("Minute") < 30))
-        )
-        cmp_segs_los_dfs.append(
-            cmp_seg_level_speed_and_los(
-                cmp_segs,
-                conf_len,
-                subset,
-                ss_threshold_peaks,
-                cur_year=YEAR,
-                cur_period="PM",
-            )
-        )
-
-        cmp_segs_los = pl.concat(cmp_segs_los_dfs, how="vertical")
-        print("Finished processing periods.")
-
-        # Calculate reliability metrics
-        cmp_segs_los = cmp_segs_los.join(
-            cmp_segs_refspd.select("cmp_segid", "refspd_inrix"),
-            on="cmp_segid",
+    # Calculate reference speed for CMP segments
+    inrix_link_refspd = cmp_df.unique(
+        subset=["Segment ID", "Ref Speed(miles/hour)"]
+    )
+    cmp_segs_refspd = (
+        conflation.join(
+            inrix_link_refspd.select(["Segment ID", "Ref Speed(miles/hour)"]),
+            left_on="INRIX_SegID",
+            right_on="Segment ID",
             how="left",
-        ).with_columns(
-            pl.max(1, (pl.col("refspd_inrix") / pl.col("pcnt5th"))).alias(
-                "tti95"
+        )
+        .drop_nulls(subset="Ref Speed(miles/hour)")
+        .with_columns(
+            (pl.col("Length_Matched") / pl.col("Ref Speed(miles/hour)")).alias(
+                "RefTT"
             ),
-            pl.max(1, (pl.col("refspd_inrix") / pl.col("pcnt20th"))).alias(
-                "tti80"
-            ),
-            pl.max(0, (pl.col("avg_speed") / pl.col("pcnt5th") - 1)).alias(
-                "bi"
-            ),
+        )
+        # at this point, turn from link-based to segment-based
+        .groupby("CMP_SegID")
+        .agg(pl.sum("Length_Matched"), pl.sum("RefTT"))
+        .with_columns(
+            (pl.col("Length_Matched") / pl.col("RefTT")).alias("refspd_inrix")
+        )
+        .rename({"CMP_SegID": "cmp_segid"})
+    )
+
+    # Create date and time fields for subsequent filtering
+    cmp_df = (
+        cmp_df.with_columns(
+            pl.col("Date Time")
+            .str.slice(0, 16)
+            .str.replace("T", " ")
+            .alias("Date_Time")
+        )
+        .with_columns(
+            pl.col("Date_Time").str.slice(0, 10).alias("Date"),
+            pl.col("Date_Time").str.to_datetime().alias("Day"),
+        )
+        .with_columns(
+            pl.col("Day").dt.weekday().alias("DOW"),  # Tue=2, Wed=3, Thu=4
+            pl.col("Day").dt.hour().alias("Hour"),
+            pl.col("Day").dt.minute().alias("Minute"),
+        )
+        # remove weekends & 0 speed
+        .filter((pl.col("DOW") <= 5) & (pl.col("Speed(miles/hour)") > 0))
+        .join(  # Get inrix_segid : cmp_segid mapping
+            conflation,
+            left_on="Segment ID",
+            right_on="INRIX_SegID",
+            how="outer",
+        )
+    )
+
+    print("Processing hourly & AM/PM periods...")
+
+    cmp_segs = gpd.read_file(
+        Path(config["geo"]["cmp_shp"])
+    )  # CMP segment shapefile
+    cmp_segs_los_dfs = []
+
+    # Hourly
+    for hour in range(24):
+        print(f"Hour = {hour}")
+        cmp_segs_los_dfs.append(
+            cmp_seg_level_speed_and_los(
+                cmp_segs,
+                conf_len,
+                cmp_df.filter(pl.col("Hour") == hour),
+                ss_threshold_hourly,
+                cur_year=config["input"]["year"],
+                cur_period=hour,
+            )
         )
 
-        # Write out df for both hourly & AM/PM peak
-        # peaks
-        cmp_segs_los.filter(pl.col("period").is_in(["AM", "PM"])).write_csv(
-            Path(OUT_DIR, OUT_FILE + "_AMPM" + ".csv")
+    # AM (7-9am)
+    print("AM Period")
+    cmp_segs_los_dfs.append(
+        cmp_seg_level_speed_and_los(
+            cmp_segs,
+            conf_len,
+            cmp_df.filter((pl.col("Hour") == 7) | (pl.col("Hour") == 8)),
+            ss_threshold_peaks,
+            cur_year=config["input"]["year"],
+            cur_period="AM",
         )
-        # hourly
-        cmp_segs_los.filter(~pl.col("period").is_in(["AM", "PM"])).rename(
-            {"period": "hour"}
-        ).write_csv(Path(OUT_DIR, OUT_FILE + "_Hourly" + ".csv"))
+    )
+
+    # PM (4:30-6:30pm)
+    print("PM Period")
+    subset = cmp_df.filter(
+        ((pl.col("Hour") == 16) & (pl.col("Minute") >= 30))
+        | (pl.col("Hour") == 17)
+        | ((pl.col("Hour") == 18) & (pl.col("Minute") < 30))
+    )
+    cmp_segs_los_dfs.append(
+        cmp_seg_level_speed_and_los(
+            cmp_segs,
+            conf_len,
+            subset,
+            ss_threshold_peaks,
+            cur_year=config["input"]["year"],
+            cur_period="PM",
+        )
+    )
+
+    cmp_segs_los = pl.concat(cmp_segs_los_dfs, how="vertical")
+    print("Finished processing periods.")
+
+    # Calculate reliability metrics
+    cmp_segs_los = cmp_segs_los.join(
+        cmp_segs_refspd.select("cmp_segid", "refspd_inrix"),
+        on="cmp_segid",
+        how="left",
+    ).with_columns(
+        pl.max(1, (pl.col("refspd_inrix") / pl.col("pcnt5th"))).alias("tti95"),
+        pl.max(1, (pl.col("refspd_inrix") / pl.col("pcnt20th"))).alias(
+            "tti80"
+        ),
+        pl.max(0, (pl.col("avg_speed") / pl.col("pcnt5th") - 1)).alias("bi"),
+    )
+
+    # Write out df for both hourly & AM/PM peak
+    # peaks
+    cmp_segs_los.filter(pl.col("period").is_in(["AM", "PM"])).write_csv(
+        Path(
+            config["output"]["dir"],
+            f'{config["output"]["filename_stem"]}_AMPM.csv',
+        )
+    )
+    # hourly
+    cmp_segs_los.filter(~pl.col("period").is_in(["AM", "PM"])).rename(
+        {"period": "hour"}
+    ).write_csv(
+        Path(
+            config["output"]["dir"],
+            f'{config["output"]["filename_stem"]}_Hourly.csv',
+        )
+    )
