@@ -2,6 +2,7 @@
 Data preparation scripts for the Congestion Management Program (CMP)
 
 ## Definitions
+- monitoring period: Tue/Wed/Thur in April and May (excluding holidays etc)
 - peak periods (in use since (at least) CMP 2007)
   - AM: 7-9am
   - PM: 4:30-6:30pm
@@ -17,3 +18,6 @@ Data preparation scripts for the Congestion Management Program (CMP)
 - GTFS data: can be downloaded from https://database.mobilitydata.org/
 ### Screenline volumes (Bay Bridge and San Mateo County Line)
 From PeMS data, use PeMS/.....py
+
+### LOS (Speed)
+Not 100% sure, but I think: Before the monitoring period, `speed/inrix/sample_size_analysis.py` is used to determine which CMP segments need to have data collected on floating car runs to supplement the INRIX data.
