@@ -54,9 +54,9 @@ for month in months:
                 filename = 'd04_text_station_5min_2019_04_0' + str(day) + '.txt'
             else:
                 filename = 'd04_text_station_5min_2019_04_' + str(day) + '.txt'
-	    df = dd.read_csv(os.path.join(PeMS_DIR, filename), names = colnames, assume_missing=True)
-	
-	    # Query out counts for selected stations
+            df = dd.read_csv(os.path.join(PeMS_DIR, filename), names = colnames, assume_missing=True)
+        
+            # Query out counts for selected stations
             df_sf_day = df[df['Station'].isin(sf_stations)].compute()
             sf_counts = sf_counts.append(df_sf_day, ignore_index=True)
             
@@ -66,7 +66,7 @@ for month in months:
                 filename = 'd04_text_station_5min_2019_05_0' + str(day) + '.txt'
             else:
                 filename = 'd04_text_station_5min_2019_05_' + str(day) + '.txt'
-	    df = dd.read_csv(os.path.join(PeMS_DIR, filename), names = colnames, assume_missing=True)
+            df = dd.read_csv(os.path.join(PeMS_DIR, filename), names = colnames, assume_missing=True)
 
             df_sf_day = df[df['Station'].isin(sf_stations)].compute()
             sf_counts = sf_counts.append(df_sf_day, ignore_index=True)

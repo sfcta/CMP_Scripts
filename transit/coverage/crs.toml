@@ -1,0 +1,6 @@
+WGS84 = "EPSG:4326"
+# For Bay Area-wide analysis:
+CA3_ft = "EPSG:2227"  # NAD83 StatePlane California zone 3 (ftUS)
+# For analysis that only involves SF:
+SF_m = "EPSG:7131"  #  NAD83(2011) San Francisco CS13 (m)
+SF_ft = "EPSG:7132"  # NAD83(2011) San Francisco CS13 (ftUS)
