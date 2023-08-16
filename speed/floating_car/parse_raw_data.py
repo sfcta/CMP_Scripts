@@ -44,6 +44,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "directory", help="floating car run raw data directory"
     )
+    # parser.add_argument(
+    #     "year", help="year of data collection (for filename and year column)"
+    # )
     args = parser.parse_args()
     dir = Path(args.directory)
 
@@ -78,5 +81,7 @@ if __name__ == "__main__":
             pl.count("speed").alias("sample_size"),
         )
         .sort("cmp_segid", "period")
-        .write_csv(dir / "floating_car-speed-summary_stats.csv")
+        # .with_columns(pl.lit(args.year).alias("year"))
+        .write_csv(dir / ".." / f"floating_car-speed-summary_stats.csv")
+        # dir / ".." / f"floating_car-speed-summary_stats.csv-{args.year}.csv"
     )
