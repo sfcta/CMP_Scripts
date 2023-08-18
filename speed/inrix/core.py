@@ -125,10 +125,17 @@ def glob_inrix_xd_zips_directory(directory, glob_pattern):
 
 
 def read_inrix_xd_zip(zip_filepath):
-    dtypes = {
-        "Hist Av Speed(miles/hour)": pl.Int64,
-        "CValue": pl.Float64,
-    }
+    columns = [
+        "Date Time",
+        "Segment ID",
+        "Speed(miles/hour)",
+        "Ref Speed(miles/hour)",
+    ]
+    # these columns aren't used anyways, so no need to specify dtype:
+    # dtypes = {
+    #     "Hist Av Speed(miles/hour)": pl.Int64,
+    #     "CValue": pl.Float64,
+    # }
     # fsspec filepath (e.g. for dask):
     # (
     #     f"zip://{_zip_hashdir(zip_filepath)}/data.csv"
@@ -137,7 +144,7 @@ def read_inrix_xd_zip(zip_filepath):
     # seems like polars cannot handle reading zip CSVs via fsspec:
     with ZipFile(zip_filepath) as z:
         with z.open(f"{_zip_hashdir(zip_filepath)}/data.csv", mode="r") as f:
-            return pl.read_csv(f.read(), dtypes=dtypes)
+            return pl.read_csv(f.read(), columns=columns)  # , dtypes=dtypes)
 
 
 def read_filtered_inrix_xd_zips(zip_filepaths, inrix_xd_segment_ids_to_keep):
