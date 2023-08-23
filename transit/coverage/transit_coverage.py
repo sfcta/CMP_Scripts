@@ -1,11 +1,11 @@
 import argparse
-import configparser
 import os
+import tomllib
+from pathlib import Path
 
 import geopandas as gpd
 import networkx as nx
 import pandas as pd
-import tomlkit  # can be replaced by tomllib (native in python after py3.11)
 from shapely import geometry
 from shapely.geometry import LineString, Point
 
@@ -580,32 +580,21 @@ def frequent_stops_access_geo(
     return frequent_stops_access_data, geo_ids
 
 
-def read_maz_attrs(
-    maz_gdf, maz_ctlfile_filepath, maz_datafile_filepath, gtfs_year
-):
-    geo_control = pd.read_csv(maz_ctlfile_filepath)
-    pop_control = geo_control.loc[
-        geo_control["year"] == int(gtfs_year), "population"
-    ].iloc[0]
-    emp_control = geo_control.loc[
-        geo_control["year"] == int(gtfs_year), "jobs"
-    ].iloc[0]
-
+def read_maz_attrs(maz_gdf, maz_datafile_filepath):
+    # Just report the percentages, do not report the actual population/
+    # employment numbers, since the MAZ demographics is often more outdated. If
+    # reporting of actual numbers is desired, scale with more updated numbers
+    # from ACS (population) and CA EDD CES (employment).
     geo_data = pd.read_csv(maz_datafile_filepath, sep=" ")
     geo_data = geo_data[geo_data["taz_p"] < 1000]
     geo_data = geo_data[["parcelid", "hh_p", "emptot_p"]]
-    geo_data["pop_p"] = (
-        geo_data["hh_p"] / geo_data["hh_p"].sum()
-    ) * pop_control
-    geo_data["emptot_p"] = (
-        geo_data["emptot_p"] / geo_data["emptot_p"].sum()
-    ) * emp_control
+    geo_data["pop_p"] = geo_data["hh_p"] / geo_data["hh_p"].sum()
+    geo_data["emptot_p"] = geo_data["emptot_p"] / geo_data["emptot_p"].sum()
     maz_gdf["MAZID"] = maz_gdf["MAZID"].astype("int64")
     geo_data["parcelid"] = geo_data["parcelid"].astype("int64")
     geo_data = maz_gdf[["MAZID", "geometry"]].merge(
         geo_data, left_on="MAZID", right_on="parcelid"
     )
-
     return geo_data
 
 
@@ -728,9 +717,8 @@ def calculate_coverage(
 
 
 def transit_coverage(config):
-    with open(CRS_TOML) as f:
-        # TODO use SF instead? Though SFCTA generally uses CA3_ft.
-        crs = tomlkit.parse(f.read())["CA3_ft"]
+    # TODO use SF instead? Though SFCTA generally uses CA3_ft.
+    crs = tomllib.load(CRS_TOML)["CA3_ft"]
 
     # GTFS directories, service ids, and years
     gtfs_dir = config["GTFS"]["DIR"]
@@ -747,7 +735,6 @@ def transit_coverage(config):
     # MAZ data
     maz_shapefile_filepath = config["ZONES"]["SHAPEFILE"]
     maz_datafile_filepath = config["ZONES"]["DATAFILE"]
-    maz_ctlfile_filepath = config["ZONES"]["CONTROLFILE"]
 
     # define parameters needed by the calculation
     min_trips = int(config["PARAMS"]["MIN_TRIPS"])
@@ -771,9 +758,7 @@ def transit_coverage(config):
     os.makedirs(output_dir, exist_ok=True)
 
     maz_gdf = read_maz(maz_shapefile_filepath, crs)
-    geo_data = read_maz_attrs(
-        maz_gdf, maz_ctlfile_filepath, maz_datafile_filepath, gtfs_year
-    )
+    geo_data = read_maz_attrs(maz_gdf, maz_datafile_filepath, gtfs_year)
     streets_gdf = read_street_network(streets_shapefile_filepath, crs)
     streets_gdf, endnodes_cnt = endnotes_from_streets(streets_gdf)
     coverage_df = calculate_coverage(
@@ -792,18 +777,18 @@ def transit_coverage(config):
         min_intersect_area_prop,
         crs,
     )
+    # Just report the percentages, do not report the actual population/
+    # employment numbers, since the MAZ demographics is often more outdated. If
+    # reporting of actual numbers is desired, scale with more updated numbers
+    # from ACS (population) and CA EDD CES (employment).
     coverage_df.to_csv(
-        os.path.join(
-            output_dir, f"cmp_transit_coverage_metrics_{gtfs_year}.csv"
-        ),
+        Path(output_dir / f"cmp_transit_coverage_metrics_{gtfs_year}.csv"),
         index=False,
     )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Calculate transit coverage.")
-    parser.add_argument("config_filepath", help="config .ini filepath")
+    parser.add_argument("config_filepath", help="config .toml filepath")
     args = parser.parse_args()
-    config = configparser.ConfigParser()
-    config.read(args.config_filepath)
-    transit_coverage(config)
+    transit_coverage(tomllib.load(args.config_filepath))
