@@ -1,13 +1,13 @@
 {
-    "[python]": {
-      "editor.defaultFormatter": "ms-python.black-formatter",
-      "editor.formatOnSave": true,
-      "editor.codeActionsOnSave": {
-        "source.organizeImports": true
-      },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true
     },
-    "black-formatter.args": ["--line-length", "79"],
-    "isort.args": ["--profile", "black"],
-    "autoDocstring.docstringFormat": "numpy"
-  }
+  },
+  "black-formatter.args": ["--line-length", "79"],
+  "isort.args": ["--profile", "black"],
+  "autoDocstring.docstringFormat": "numpy"
+}
   
