@@ -540,6 +540,7 @@ def cmp_seg_level_speed_and_los_monthly(
             "sample_size",
             "comment",
         )
+        .with_columns(pl.lit("INRIX").alias("source"))
     )
 
 
