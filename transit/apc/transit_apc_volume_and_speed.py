@@ -280,7 +280,7 @@ def match_intermediate_apc_stops(
     )
 
     apc_trip_speeds.to_csv(
-        output_dir / f"CMP2021_APC_Matched_Trips_{timep}.csv", index=False
+        output_dir / f"CMP{year}_APC_Matched_Trips_{timep}.csv", index=False
     )
 
     # Only include trips covering at least 50% of CMP length
