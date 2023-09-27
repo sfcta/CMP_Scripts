@@ -93,6 +93,24 @@ def calculate_boardings_alightings_loads(apc_notnull, stops):
     return stop_vol_complete
 
 
+def update_apc_stopid(apc_df, year):
+    """Update the APC DataFrame to use the new (post-2023) stop IDs
+
+    For 2023/04-05 APC data, the APC stop IDs were still using the old
+    (pre-2022) stop IDs (< 10000), whereas the GTFS data were already using the
+    new stop IDs (> 10000).
+    BS_ID is the column name for stop IDs
+    """
+    if year > 2022:
+        return apc_df.with_columns(
+            pl.when(pl.col("BS_ID") < 10000)  # if old (pre-2022) stop ID
+            .then(pl.col("BS_ID") + 10000)  # then convert to new stop ID
+            .otherwise(pl.col("BS_ID"))  # else leave as is
+        )
+    else:
+        return apc_df
+
+
 def match_intermediate_apc_stops(
     apc_pairs,
     apc_cmp,
@@ -612,19 +630,20 @@ def match_stop_pairs_to_cmp(
     apc_pairs_df = pd.DataFrame.from_dict(apc_pairs_dict)
 
     # Update the stop location for CMP 175 due to its irregular geometry
+    # stop IDs are renumbered (+10000) between 2022/2023
     apc_pairs_df["cur_stop_loc"] = np.where(
         apc_pairs_df["cmp_segid"] == 175,
         np.where(
-            apc_pairs_df["cur_stop_id"] == 5543,
+            apc_pairs_df["cur_stop_id"].isin({5543, 15543}),
             173.935,
             np.where(
-                apc_pairs_df["cur_stop_id"] == 5545,
+                apc_pairs_df["cur_stop_id"].isin({5545, 15545}),
                 1020.629,
                 np.where(
-                    apc_pairs_df["cur_stop_id"] == 5836,
+                    apc_pairs_df["cur_stop_id"].isin({5836, 15836}),
                     1804.72,
                     np.where(
-                        apc_pairs_df["cur_stop_id"] == 5835,
+                        apc_pairs_df["cur_stop_id"].isin({5835, 15835}),
                         2685.807,
                         apc_pairs_df["cur_stop_loc"],
                     ),
@@ -636,16 +655,16 @@ def match_stop_pairs_to_cmp(
     apc_pairs_df["next_stop_loc"] = np.where(
         apc_pairs_df["cmp_segid"] == 175,
         np.where(
-            apc_pairs_df["next_stop_id"] == 5543,
+            apc_pairs_df["next_stop_id"].isin({5543, 15543}),
             173.935,
             np.where(
-                apc_pairs_df["next_stop_id"] == 5545,
+                apc_pairs_df["next_stop_id"].isin({5545, 15545}),
                 1020.629,
                 np.where(
-                    apc_pairs_df["next_stop_id"] == 5836,
+                    apc_pairs_df["next_stop_id"].isin({5836, 15836}),
                     1804.72,
                     np.where(
-                        apc_pairs_df["next_stop_id"] == 5835,
+                        apc_pairs_df["next_stop_id"].isin({5835, 15835}),
                         2685.807,
                         apc_pairs_df["next_stop_loc"],
                     ),
@@ -728,7 +747,7 @@ def calculate_transit_speed_and_reliability(
         stop_names = stops.loc[stop_idx]["street_1"].split("/")
         if "point lobos" in stop_names:
             stop_names = stop_names + ["geary"]
-        if stop_id == 7357:
+        if stop_id in {7357, 17357}:  # stop IDs renumbered (+10000) in 2022/23
             stop_names = stop_names + ["third st"]
 
         cmp_segs_int = cmp_segs_intersect[
@@ -804,6 +823,12 @@ def calculate_transit_speed_and_reliability(
         (143, 4824),
         (172, 5603),
     ]
+    # stop IDs renumbered (+10000) in 2022/23
+    if year > 2022:
+        [
+            (cmp_seg_id, stop_id + 10000)
+            for (cmp_seg_id, stop_id) in remove_cmp_stop
+        ]
     for remove_idx in range(len(remove_cmp_stop)):
         rmv_cmp_id = remove_cmp_stop[remove_idx][0]
         rmv_stop_id = remove_cmp_stop[remove_idx][1]
@@ -1045,7 +1070,7 @@ def transit_volume_and_speed(config):
         Path(config["cmp_inrix_network_conflation_filepath"])
     )
 
-    apc_notnull = create_apc_notnull(apc_df)
+    apc_notnull = create_apc_notnull(update_apc_stopid(apc_df, year))
     calculate_boardings_alightings_loads(apc_notnull, stops).to_csv(
         output_dir / f"Muni-APC-Transit_Volume-{year}.csv", index=False
     )
