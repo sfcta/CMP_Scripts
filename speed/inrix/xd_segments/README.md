@@ -42,9 +42,9 @@ In the following, `xx0x` refers to the map release version (e.g. 2301 for map re
 2. Filter for only SF data in the Bay Area shapefile downloaded in step 1.2.1: run `python bayarea_to_sf.py xx0x`.
 3. Create `Q:\CMP\LOS Monitoring YYYY\Network_Conflation\vxx0x\`, where `YYYY` is that the map version was released, e.g. `Q:\CMP\LOS Monitoring 2022\Network_Conflation\v2202` for map release version 22.2.
 4. Copy `Q:\GIS\Transportation\Roads\INRIX\XD\xx0x\INRIX_XD-SF-xx0x.gpkg` (created in step 2) into `Q:\CMP\LOS Monitoring YYYY\Network_Conflation\vxx0x\` (created in step 3).
-5. `SF_CMP_INRIX_Network_Conflation.py`.
+5. `Conflation/SF_CMP_INRIX_Network_Conflation.py`.
     1. Copy `CMP_Scripts/Conflation/SF_CMP_INRIX_Network_Conflation.py` to `Q:\CMP\LOS Monitoring YYYY\Network_Conflation\vxx0x\` (created in step 3).
-    2. Change the `MAP_VER` (to `xx0x`, i.e. the current INRIX map release version) and `cmp` (to `Q:\GIS\Transportation\Roads\CMP\cmp_roadway_segments` if conflating onto the CMP network (as in the biennial reports), or `Q:\CMP\LOS Monitoring 2022\CMP_exp_shp\cmp_segments_exp_v2201.shp` if conflating onto the online COVID monthly congestion tracker network) variables as appropriate.
+    2. Change the `MAP_VER` (to `xx0x`, i.e. the current INRIX map release version) and `cmp` (to `Q:\GIS\Transportation\Roads\CMP\cmp_roadway_segments` if conflating onto the CMP network (as in the biennial reports), or `Q:\CMP\LOS Monitoring 2022\CMP_exp_shp\cmp_segments_exp_v2201` if conflating onto the online COVID monthly congestion tracker network) variables as appropriate.
     3. Leave the `MANUAL_UPDATE` variable at the end of the script as `True`. Start by using `manual_add.csv` and `manual_remove.csv` from the previous update.
     4. `cd` into `Q:\CMP\LOS Monitoring YYYY\Network_Conflation\vxx0x\` (created in step 3), then run `python SF_CMP_INRIX_Network_Conflation.py`.
     5. Probably: make changes to `manual_add.csv` and `manual_remove.csv` as needed and rerun step 4.
