@@ -339,7 +339,7 @@ def match_intermediate_apc_stops(
 
 
 def match_stop_pairs_to_cmp(
-    apc_df,
+    apc_cmp_df,
     stops_near_cmp_list,
     cmp_segs_near,
     cmp_segments_gdf,
@@ -372,20 +372,20 @@ def match_stop_pairs_to_cmp(
     # apc_pairs_schema = {"route_alpha": pl.Utf8}
     apc_pairs_dict = {key: [] for key in apc_pairs_columns}
     # Enumerate the records in apc_cmp_df
-    # TODO for efficiency, we should not be looping through the elements 1-by-1
-    for cur_stop_idx in range(len(apc_df) - 2):
+    # TODO we should not be looping through the elements one by one
+    for cur_stop_idx in range(len(apc_cmp_df) - 2):
         # Check if the stop_id is in the previously matched list
-        if apc_df.loc[cur_stop_idx, "stop_id"] in stops_near_cmp_list:
+        if apc_cmp_df.loc[cur_stop_idx, "stop_id"] in stops_near_cmp_list:
             next_stop_match = 0
             if (
-                apc_df.loc[cur_stop_idx + 1, "stop_id"]
+                apc_cmp_df.loc[cur_stop_idx + 1, "stop_id"]
                 in stops_near_cmp_list
             ):
                 next_stop_idx = cur_stop_idx + 1
                 next_stop_match = 1
             # This is to ensure the stop_id associated with cur_stop_idx + 2 is also checked when the stop_id associated with cur_stop_idx + 1 is not found in the matched list
             elif (
-                apc_df.loc[cur_stop_idx + 2, "stop_id"]
+                apc_cmp_df.loc[cur_stop_idx + 2, "stop_id"]
                 in stops_near_cmp_list
             ):
                 next_stop_idx = cur_stop_idx + 2
@@ -393,22 +393,22 @@ def match_stop_pairs_to_cmp(
 
             if next_stop_match > 0:
                 # Transit stop of interest
-                cur_stop_trip_id = apc_df.loc[
+                cur_stop_trip_id = apc_cmp_df.loc[
                     cur_stop_idx, "TRIP_ID_EXTERNAL"
                 ]
-                cur_stop_date = apc_df.loc[cur_stop_idx, "Date"]
-                cur_stop_veh_id = apc_df.loc[cur_stop_idx, "VEHICLE_ID"]
-                cur_stop_route_alpha = apc_df.loc[
+                cur_stop_date = apc_cmp_df.loc[cur_stop_idx, "Date"]
+                cur_stop_veh_id = apc_cmp_df.loc[cur_stop_idx, "VEHICLE_ID"]
+                cur_stop_route_alpha = apc_cmp_df.loc[
                     cur_stop_idx, "ROUTE_ALPHA"
                 ]
-                cur_stop_route_dir = apc_df.loc[cur_stop_idx, "DIRECTION"]
+                cur_stop_route_dir = apc_cmp_df.loc[cur_stop_idx, "DIRECTION"]
 
                 # Succeeding candidate stop in the dataframe
-                next_stop_trip_id = apc_df.loc[
+                next_stop_trip_id = apc_cmp_df.loc[
                     next_stop_idx, "TRIP_ID_EXTERNAL"
                 ]
-                next_stop_date = apc_df.loc[next_stop_idx, "Date"]
-                next_stop_veh_id = apc_df.loc[next_stop_idx, "VEHICLE_ID"]
+                next_stop_date = apc_cmp_df.loc[next_stop_idx, "Date"]
+                next_stop_veh_id = apc_cmp_df.loc[next_stop_idx, "VEHICLE_ID"]
 
                 # Check if two stops share the same trip id, date, and vehicle id
                 if (
@@ -416,25 +416,25 @@ def match_stop_pairs_to_cmp(
                     & (cur_stop_date == next_stop_date)
                     & (cur_stop_veh_id == next_stop_veh_id)
                 ):
-                    cur_stop_id = apc_df.loc[cur_stop_idx, "stop_id"]
-                    cur_stop_open_time = apc_df.loc[
+                    cur_stop_id = apc_cmp_df.loc[cur_stop_idx, "stop_id"]
+                    cur_stop_open_time = apc_cmp_df.loc[
                         cur_stop_idx, "Open_Time"
                     ]
-                    cur_stop_close_time = apc_df.loc[
+                    cur_stop_close_time = apc_cmp_df.loc[
                         cur_stop_idx, "Close_Time"
                     ]
-                    cur_stop_dwell_time = apc_df.loc[
+                    cur_stop_dwell_time = apc_cmp_df.loc[
                         cur_stop_idx, "DWELL_TIME"
                     ]
 
-                    next_stop_id = apc_df.loc[next_stop_idx, "stop_id"]
-                    next_stop_open_time = apc_df.loc[
+                    next_stop_id = apc_cmp_df.loc[next_stop_idx, "stop_id"]
+                    next_stop_open_time = apc_cmp_df.loc[
                         next_stop_idx, "Open_Time"
                     ]
-                    next_stop_close_time = apc_df.loc[
+                    next_stop_close_time = apc_cmp_df.loc[
                         next_stop_idx, "Close_Time"
                     ]
-                    next_stop_dwell_time = apc_df.loc[
+                    next_stop_dwell_time = apc_cmp_df.loc[
                         next_stop_idx, "DWELL_TIME"
                     ]
 
@@ -457,10 +457,10 @@ def match_stop_pairs_to_cmp(
                     )
 
                     if len(common_segs) > 0:
-                        cur_stop_geo = apc_df.loc[cur_stop_idx][
+                        cur_stop_geo = apc_cmp_df.loc[cur_stop_idx][
                             "geometry"
                         ]  # location geometry of current stop
-                        next_stop_geo = apc_df.loc[next_stop_idx][
+                        next_stop_geo = apc_cmp_df.loc[next_stop_idx][
                             "geometry"
                         ]  # location geometry of succeeding stop
 
@@ -602,7 +602,7 @@ def match_stop_pairs_to_cmp(
                                             apc_pairs_dict[
                                                 "cur_next_rev_dis"
                                             ].append(
-                                                apc_df.loc[
+                                                apc_cmp_df.loc[
                                                     cur_stop_idx,
                                                     "REV_DISTANCE",
                                                 ]
@@ -611,11 +611,11 @@ def match_stop_pairs_to_cmp(
                                             apc_pairs_dict[
                                                 "cur_next_rev_dis"
                                             ].append(
-                                                apc_df.loc[
+                                                apc_cmp_df.loc[
                                                     cur_stop_idx,
                                                     "REV_DISTANCE",
                                                 ]
-                                                + apc_df.loc[
+                                                + apc_cmp_df.loc[
                                                     cur_stop_idx + 1,
                                                     "REV_DISTANCE",
                                                 ]
@@ -624,7 +624,7 @@ def match_stop_pairs_to_cmp(
         if cur_stop_idx % 50000 == 0:
             print(
                 "Processed %s percent"
-                % round(100 * cur_stop_idx / len(apc_df), 2)
+                % round(100 * cur_stop_idx / len(apc_cmp_df), 2)
             )
 
     apc_pairs_df = pd.DataFrame.from_dict(apc_pairs_dict)
@@ -839,7 +839,7 @@ def calculate_transit_speed_and_reliability(
         if len(remove_df_idx) > 0:
             cmp_segs_near = cmp_segs_near.drop([remove_df_idx[0]], axis=0)
 
-    apc_filtered = (
+    apc_cmp = (
         pl.from_pandas(apc_notnull)
         .filter(
             ((pl.col("DOW") > 1) & (pl.col("DOW") < 5))  # only Tue, Wed, Thu
@@ -865,19 +865,19 @@ def calculate_transit_speed_and_reliability(
     angle_thrd = 10
 
     # ## AM
-    apc_am = apc_filtered[
-        (apc_filtered["Open_Hour"] < 9) & (apc_filtered["Close_Hour"] > 6)
+    apc_cmp_am = apc_cmp[
+        (apc_cmp["Open_Hour"] < 9) & (apc_cmp["Close_Hour"] > 6)
     ]
-    apc_am = apc_am.merge(
+    apc_cmp_am = apc_cmp_am.merge(
         stops, left_on="BS_ID", right_on="stop_id", how="left"
     )
-    apc_am = apc_am.sort_values(
+    apc_cmp_am = apc_cmp_am.sort_values(
         by=["TRIP_ID_EXTERNAL", "Date", "VEHICLE_ID", "Open_Time"]
     ).reset_index()
 
     print("------------Start processing AM trips------------")
     apc_pairs_am = match_stop_pairs_to_cmp(
-        apc_am,
+        apc_cmp_am,
         stops_near_cmp_list,
         cmp_segs_near,
         cmp_segments_gdf,
@@ -885,21 +885,21 @@ def calculate_transit_speed_and_reliability(
     )
 
     # ## PM
-    apc_pm = apc_filtered[
-        (apc_filtered["Open_Time_float"] <= 18.5)
-        & (apc_filtered["Close_Time_float"] >= 16.5)
+    apc_cmp_pm = apc_cmp[
+        (apc_cmp["Open_Time_float"] <= 18.5)
+        & (apc_cmp["Close_Time_float"] >= 16.5)
     ]
 
-    apc_pm = apc_pm.merge(
+    apc_cmp_pm = apc_cmp_pm.merge(
         stops, left_on="BS_ID", right_on="stop_id", how="left"
     )
-    apc_pm = apc_pm.sort_values(
+    apc_cmp_pm = apc_cmp_pm.sort_values(
         by=["TRIP_ID_EXTERNAL", "Date", "VEHICLE_ID", "Open_Time"]
     ).reset_index()
 
     print("------------Start processing PM trips------------")
     apc_pairs_pm = match_stop_pairs_to_cmp(
-        apc_pm,
+        apc_cmp_pm,
         stops_near_cmp_list,
         cmp_segs_near,
         cmp_segments_gdf,
@@ -910,7 +910,7 @@ def calculate_transit_speed_and_reliability(
     # ## AM
     apc_cmp_speeds_am = match_intermediate_apc_stops(
         apc_pairs_am,
-        apc_am,
+        apc_cmp_am,
         overlap_pairs,
         cmp_segments_gdf,
         "AM",
@@ -921,7 +921,7 @@ def calculate_transit_speed_and_reliability(
     # ## PM
     apc_cmp_speeds_pm = match_intermediate_apc_stops(
         apc_pairs_pm,
-        apc_pm,
+        apc_cmp_pm,
         overlap_pairs,
         cmp_segments_gdf,
         "PM",
