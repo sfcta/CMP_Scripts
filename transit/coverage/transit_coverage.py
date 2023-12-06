@@ -2,6 +2,7 @@ import argparse
 import os
 import tomllib
 from pathlib import Path
+from zipfile import ZipFile
 
 import geopandas as gpd
 import networkx as nx
@@ -14,8 +15,16 @@ COUNTIES_BOUNDARIES_GIS_FILEPATH = "Q:\GIS\Boundaries\Counties\Counties.shp"
 COUNTIES_BOUNDARIES_GIS_CRS = "EPSG:2227"
 
 
+def read_gtfs_txt(gtfs_dir: Path | str, filename: str):
+    if gtfs_dir.suffix == ".zip":
+        with ZipFile(gtfs_dir, "r") as z:
+            return pd.read_csv(z.open(filename))
+    else:
+        return pd.read_csv(Path(gtfs_dir) / filename)
+
+
 def read_stops(gtfs_dir, to_crs):
-    stops_df = pd.read_csv(os.path.join(gtfs_dir, "stops.txt"))
+    stops_df = read_gtfs_txt(gtfs_dir, "stops.txt")
     stops_gdf = gpd.GeoDataFrame(
         stops_df,
         geometry=gpd.points_from_xy(stops_df.stop_lon, stops_df.stop_lat),
@@ -24,19 +33,19 @@ def read_stops(gtfs_dir, to_crs):
     return stops_gdf
 
 
-def read_shapes(gtfs_dir: str, service_id: str):
+def read_shapes(gtfs_dir: Path | str, service_id: str | int):
     """
     read GTFS shapes and trips
 
     Parameters
     ----------
     gtfs_dir
-        directory containing the GTFS .txt files
+        directory/zipfile containing the GTFS .txt files
     service_id
         unique identifier for service pattern over a set of dates when
         service is available for one or more routes, defined in calendar.txt
     """
-    shapes = pd.read_csv(os.path.join(gtfs_dir, "shapes.txt"))
+    shapes = read_gtfs_txt(gtfs_dir, "shapes.txt")
     shp_ids = shapes.shape_id.unique()
     linestrs = []
     for shp_id in shp_ids:
@@ -48,19 +57,26 @@ def read_shapes(gtfs_dir: str, service_id: str):
         {"shape_id": shp_ids, "geometry": linestrs}, crs="EPSG:4326"
     )
 
-    trips = pd.read_csv(os.path.join(gtfs_dir, "trips.txt"))
+    trips = read_gtfs_txt(gtfs_dir, "trips.txt")
     trips["service_id"] = trips["service_id"].astype(str)
-    trips = trips[trips["service_id"] == service_id]
+    trips = trips[trips["service_id"] == str(service_id)]
     trips_shapes = shapes_gdf[shapes_gdf["shape_id"].isin(trips["shape_id"])]
     return trips, trips_shapes
 
 
 def read_routes(gtfs_dir):
-    return pd.read_csv(os.path.join(gtfs_dir, "routes.txt"))
+    return read_gtfs_txt(gtfs_dir, "routes.txt")
 
 
 def read_stop_times(gtfs_dir):
-    return pd.read_csv(os.path.join(gtfs_dir, "stop_times.txt"))
+    df = read_gtfs_txt(gtfs_dir, "stop_times.txt")
+    # SFMTA sometimes has arrival/departure_time's that miss the leading 0
+    # (i.e. H:MM:SS for before noon, rather than HH:MM:SS). This causes an
+    # issue later when comparing timestamps directly as strs.
+    # Zero pad these two columns:
+    df["arrival_time"] = df["arrival_time"].str.zfill(8)  # left pad "0"
+    df["departure_time"] = df["departure_time"].str.zfill(8)  # left pad "0"
+    return df
 
 
 def filter_trips_by_time(
@@ -156,13 +172,7 @@ def frequent_routes(
         route_frequent_shapes.to_file(
             os.path.join(
                 output_dir,
-                "frequent_routes_"
-                + output_tag
-                + "_"
-                + outname
-                + "_"
-                + peak_period
-                + ".gpkg",
+                f"frequent_routes_{output_tag}_{outname}_{peak_period}.gpkg",
             )
         )
     else:
@@ -225,13 +235,7 @@ def frequent_stops(
         stop_frequent_gdf.to_file(
             os.path.join(
                 output_dir,
-                "frequent_stops_"
-                + output_tag
-                + "_"
-                + outname
-                + "_"
-                + peak_period
-                + ".gpkg",
+                f"frequent_stops_{output_tag}_{outname}_{peak_period}.gpkg",
             )
         )
     else:
@@ -655,13 +659,7 @@ def calculate_coverage(
             frequent_stops_access_area.to_crs(epsg=4326).to_file(
                 os.path.join(
                     output_dir,
-                    "frequent_stops_"
-                    + output_tag
-                    + "_"
-                    + gtfs_year
-                    + "_"
-                    + peak_period
-                    + "buffer.gpkg",
+                    f"frequent_stops_{output_tag}_{gtfs_year}_{peak_period}buffer.gpkg",
                 )
             )
             frequent_stops_access_union = (
@@ -679,13 +677,7 @@ def calculate_coverage(
             ].to_crs("EPSG:4326").to_file(
                 os.path.join(
                     output_dir,
-                    "coverage_"
-                    + output_tag
-                    + "_"
-                    + gtfs_year
-                    + "_"
-                    + peak_period
-                    + "buffer.gpkg",
+                    f"coverage_{output_tag}_{gtfs_year}_{peak_period}buffer.gpkg",
                 )
             )
 
@@ -718,10 +710,11 @@ def calculate_coverage(
 
 def transit_coverage(config):
     # TODO use SF instead? Though SFCTA generally uses CA3_ft.
-    crs = tomllib.load(CRS_TOML)["CA3_ft"]
+    with open(CRS_TOML, "rb") as f:
+        crs = tomllib.load(f)["CA3_ft"]
 
     # GTFS directories, service ids, and years
-    gtfs_dir = config["GTFS"]["DIR"]
+    gtfs_dir = Path(config["GTFS"]["DIR"])
     gtfs_service_id = config["GTFS"]["SERVICE_ID"]
     gtfs_year = config["GTFS"]["YEAR"]
 
@@ -758,7 +751,7 @@ def transit_coverage(config):
     os.makedirs(output_dir, exist_ok=True)
 
     maz_gdf = read_maz(maz_shapefile_filepath, crs)
-    geo_data = read_maz_attrs(maz_gdf, maz_datafile_filepath, gtfs_year)
+    geo_data = read_maz_attrs(maz_gdf, maz_datafile_filepath)
     streets_gdf = read_street_network(streets_shapefile_filepath, crs)
     streets_gdf, endnodes_cnt = endnotes_from_streets(streets_gdf)
     coverage_df = calculate_coverage(
@@ -782,7 +775,7 @@ def transit_coverage(config):
     # reporting of actual numbers is desired, scale with more updated numbers
     # from ACS (population) and CA EDD CES (employment).
     coverage_df.to_csv(
-        Path(output_dir / f"cmp_transit_coverage_metrics_{gtfs_year}.csv"),
+        Path(output_dir) / f"cmp_transit_coverage_metrics_{gtfs_year}.csv",
         index=False,
     )
 
@@ -791,4 +784,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Calculate transit coverage.")
     parser.add_argument("config_filepath", help="config .toml filepath")
     args = parser.parse_args()
-    transit_coverage(tomllib.load(args.config_filepath))
+    with open(args.config_filepath, "rb") as f:
+        transit_coverage(tomllib.load(f))
