@@ -758,17 +758,23 @@ def calculate_reliability_metrics(
         how="left",
     ).with_columns(
         when_inrix.then(
-            pl.max(1, (pl.col("refspd_inrix") / pl.col("pcnt5th")))
+            pl.max_horizontal(
+                pl.lit(1), (pl.col("refspd_inrix") / pl.col("pcnt5th"))
+            )
         )
         .otherwise(None)
         .alias("tti95"),
         when_inrix.then(
-            pl.max(1, (pl.col("refspd_inrix") / pl.col("pcnt20th")))
+            pl.max_horizontal(
+                pl.lit(1), (pl.col("refspd_inrix") / pl.col("pcnt20th"))
+            )
         )
         .otherwise(None)
         .alias("tti80"),
         when_inrix.then(
-            pl.max(0, (pl.col("avg_speed") / pl.col("pcnt5th") - 1))
+            pl.max_horizontal(
+                pl.lit(0), (pl.col("avg_speed") / pl.col("pcnt5th") - 1)
+            )
         )
         .otherwise(None)
         .alias("bi"),
@@ -778,7 +784,9 @@ def calculate_reliability_metrics(
     else:
         return segments_df.with_columns(
             when_inrix.then(
-                pl.max(1, (pl.col("pcnt50th") / pl.col("pcnt20th")))
+                pl.max_horizontal(
+                    pl.lit(1), (pl.col("pcnt50th") / pl.col("pcnt20th"))
+                )
             )
             .otherwise(None)
             .alias("lottr")
