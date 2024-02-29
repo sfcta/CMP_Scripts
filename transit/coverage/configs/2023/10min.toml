@@ -1,0 +1,20 @@
+[GTFS]
+DIR = "Q:/Data/GTFS/Muni/2020s/GTFS-Muni-230321-230609/GTFS-Muni-230321-230609.zip"
+SERVICE_ID = 78802
+YEAR = 2023
+
+[STREETS]
+SHAPEFILE = "Q:/CMP/LOS Monitoring 2021/Transit/Coverage/champ_hwy_shapefile/champ_freeflow.shp"
+
+[ZONES]
+SHAPEFILE = "Q:/GIS/Model/MAZ/MAZ40051.shp"
+DATAFILE = "Y:/champ/landuse/y2019/dtx_20210207/4-Daysim/maz_stline_buffer.dat"
+
+[PARAMS]
+MIN_TRIPS = 10
+BUFFER_RAD_MI = 0.25
+MIN_INTERSECT_AREA = 0.33
+
+[OUTPUT]
+DIR = "Q:/CMP/LOS Monitoring 2023/transit/coverage/2023/10min"
+TAG = "10min"
