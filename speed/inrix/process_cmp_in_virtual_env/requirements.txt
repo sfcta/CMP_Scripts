@@ -1,0 +1,8 @@
+geopandas==0.14.1
+numpy==1.24.3
+pandas==2.1.4
+polars==0.20.14
+pyarrow==15.0.1
+sqlalchemy==2.0.23
+psycopg2==2.9.9
+openpyxl==3.1.2
