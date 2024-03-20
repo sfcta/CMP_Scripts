@@ -1,7 +1,7 @@
 import argparse
+import json
 import tomllib
 from pathlib import Path
-import json
 
 from core import (
     glob_inrix_xd_zips_directory,
