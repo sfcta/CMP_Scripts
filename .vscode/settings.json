@@ -1,13 +1,12 @@
 {
   "[python]": {
-    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
       "source.organizeImports": "explicit"
     },
   },
-  "black-formatter.args": ["--line-length", "79"],
-  "isort.args": ["--profile", "black"],
   "autoDocstring.docstringFormat": "numpy",
   "notebook.formatOnSave.enabled": true,
   "notebook.formatOnCellExecution": true,
