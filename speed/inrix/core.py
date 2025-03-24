@@ -89,7 +89,7 @@ def los_2000(road_class: pl.Expr, speed: pl.Expr):
 def read_cmp_inrix_conflation(filepath):
     """read CMP-INRIX segment correspondence table"""
     conflation_df = pl.read_csv(filepath)
-    cmp_segment_conflated_length = conflation_df.groupby("CMP_SegID").agg(
+    cmp_segment_conflated_length = conflation_df.group_by("CMP_SegID").agg(
         pl.sum("Length_Matched").alias("CMP_Length")
     )
     return conflation_df, cmp_segment_conflated_length
@@ -180,9 +180,7 @@ def inrix_to_cmp_reference_speed(inrix_xd_segments_df, conflation_df):
         # TODO joining is expensive, this shouldn't be done twice
         create_inrix_cmp_segments_mapping(
             (
-                inrix_xd_segments_df.select(
-                    ["Segment ID", "Ref Speed(miles/hour)"]
-                )
+                inrix_xd_segments_df.select(["Segment ID", "Ref Speed(miles/hour)"])
                 .drop_nulls(subset="Ref Speed(miles/hour)")
                 .unique()  # TODO shouldn't we groupby("Segment ID") then avg over ref speed instead?
             ),
@@ -190,12 +188,10 @@ def inrix_to_cmp_reference_speed(inrix_xd_segments_df, conflation_df):
             "inner",
         )
         .with_columns(
-            (pl.col("Length_Matched") / pl.col("Ref Speed(miles/hour)")).alias(
-                "RefTT"
-            ),
+            (pl.col("Length_Matched") / pl.col("Ref Speed(miles/hour)")).alias("RefTT"),
         )
         # turn from INRIX to CMP segment IDs as the 'index'
-        .groupby("CMP_SegID")
+        .group_by("CMP_SegID")
         .agg(pl.sum("Length_Matched"), pl.sum("RefTT"))
         .with_columns(
             (pl.col("Length_Matched") / pl.col("RefTT")).alias("refspd_inrix")
@@ -207,6 +203,7 @@ def inrix_to_cmp_reference_speed(inrix_xd_segments_df, conflation_df):
 
 def add_time_fields(inrix_xd_segments_df):
     # Create date and time fields for subsequent filtering
+    # TODO change to parse into datetime first and then use datetime directly
     return (
         inrix_xd_segments_df.with_columns(
             pl.col("Date Time")
@@ -215,20 +212,18 @@ def add_time_fields(inrix_xd_segments_df):
             .alias("Date_Time")
         )
         .with_columns(
-            pl.col("Date_Time").str.slice(0, 10).alias("Date"),
-            pl.col("Date_Time").str.to_datetime().alias("Day"),
+            date=pl.col("Date_Time").str.slice(0, 10),
+            datetime=pl.col("Date_Time").str.to_datetime(),
         )
         .with_columns(
-            pl.col("Day").dt.weekday().alias("DOW"),  # Tue=2, ..., Thu=4, ...
-            pl.col("Day").dt.hour().alias("Hour"),
-            pl.col("Day").dt.minute().alias("Minute"),
+            pl.col("datetime").dt.weekday().alias("DOW"),  # Tue=2, ..., Thu=4, ...
+            pl.col("datetime").dt.hour().alias("Hour"),
+            pl.col("datetime").dt.minute().alias("Minute"),
         )
     )
 
 
-def create_inrix_cmp_segments_mapping(
-    inrix_xd_segments_df, conflation_df, how
-):
+def create_inrix_cmp_segments_mapping(inrix_xd_segments_df, conflation_df, how):
     """attach INRIX speeds to CMP segments via INRIX/CMP Segment ID mapping"""
     # TODO why is this done twice?
     return inrix_xd_segments_df.join(
@@ -281,12 +276,9 @@ def create_periods_tuples(
     ]
     if monthly_update:
         if hourly_min_sample_size is None:
-            raise RuntimeError(
-                "Monthly updates require hourly_min_sample_size."
-            )
+            raise RuntimeError("Monthly updates require hourly_min_sample_size.")
         hour_periods_tuples = [
-            (str(hour), hour_filter(hour), hourly_min_sample_size)
-            for hour in range(24)
+            (str(hour), hour_filter(hour), hourly_min_sample_size) for hour in range(24)
         ]
         return hour_periods_tuples + peak_periods_filters
     else:
@@ -314,14 +306,16 @@ def _spatial_coverage(
     # TODO remove the monthly vs 2-year cycle discrepancy if not needed
     # TODO replacing column names with a list of column names like this is bad
     #      practice; use a dict so you know what you're renaming from/to instead
+    # TODO unify the sample size (and other?) calculations with calculate_sample_size()
+    #      in sample_size_analysis.py
     if monthly:
         speed_groupby_aggs = ["std", percentile(5), percentile(20)]
         sample_size_col_name = "sample_size"
         rename_cols = [
-            "cmp_segid",
-            "date",
-            sample_size_col_name,
-            "travel_time",
+            "cmp_segid",  # from group_cols, renamed from "CMP_SegID"
+            "date",  # from group_cols, renamed from "Date"
+            sample_size_col_name,  # from count(travel_time) in the groupby-agg
+            "travel_time",  # from sum(travel_time) in the groupby-agg
             "Len",
             "std_speed",
             "pcnt5th",
@@ -331,9 +325,9 @@ def _spatial_coverage(
         speed_groupby_aggs = "std"
         sample_size_col_name = "sample_size_los"
         rename_cols = [
-            "cmp_segid",
-            sample_size_col_name,
-            "travel_time",
+            "cmp_segid",  # from group_cols, renamed from "CMP_SegID"
+            sample_size_col_name,  # from count(travel_time) in the groupby-agg
+            "travel_time",  # from sum(travel_time) in the groupby-agg
             "Len",
             "std_speed",
         ]
@@ -360,9 +354,7 @@ def _spatial_coverage(
             )
             .reset_index()
         )
-        cmp_tt_agg.columns = (
-            rename_cols  # flattens the columnar MultiIndex too
-        )
+        cmp_tt_agg.columns = rename_cols  # flattens the columnar MultiIndex too
         cmp_tt_agg["avg_speed"] = round(
             cmp_tt_agg["Len"] / cmp_tt_agg["travel_time"], 3
         )
@@ -405,9 +397,7 @@ def spatial_coverages(
             monthly=monthly,
         )
         if coverage is not None:
-            cmp_period_agg = pd.concat(
-                (cmp_period_agg, coverage), ignore_index=True
-            )
+            cmp_period_agg = pd.concat((cmp_period_agg, coverage), ignore_index=True)
     return cmp_period_agg
 
 
@@ -447,9 +437,7 @@ def process_inrix_xd_data(
         inrix_xd_segments_df, conflation_df
     )
     # TODO cmp/inrix mapping should only be done once
-    day_of_week_filter = (
-        weekday_filter if monthly_update else tue_to_thu_filter
-    )
+    day_of_week_filter = weekday_filter if monthly_update else tue_to_thu_filter
     inrix_xd_segments_df = create_inrix_cmp_segments_mapping(
         (add_time_fields(inrix_xd_segments_df).filter(day_of_week_filter)),
         conflation_df,
@@ -459,6 +447,28 @@ def process_inrix_xd_data(
         inrix_xd_segments_df,
         cmp_segment_conflated_length,
         cmp_segments_reference_speed_df,
+    )
+
+
+def cmp_segments_datetime_speed_from_inrix(
+    inrix_xd_segments_df, cmp_segment_conflated_length
+):
+    """total travel time at a particular date_time on a CMP segment"""
+    return (
+        inrix_xd_segments_df.with_columns(
+            (pl.col("Length_Matched") / pl.col("Speed(miles/hour)")).alias(
+                "travel_time"
+            )
+        )
+        .group_by(["CMP_SegID", "Date", "Date_Time"])
+        .agg(pl.sum("Length_Matched"), pl.sum("travel_time"))
+        .join(cmp_segment_conflated_length, on="CMP_SegID", how="left")
+        .with_columns(
+            (pl.col("Length_Matched") / pl.col("travel_time")).alias("Speed"),
+            (100 * pl.col("Length_Matched") / pl.col("CMP_Length")).alias(
+                "spatial_coverage"
+            ),
+        )
     )
 
 
@@ -476,24 +486,9 @@ def cmp_seg_level_speed_and_los_monthly(
     """
     groupby_cols = ["CMP_SegID", "Date"]
 
-    cmp_period = (
-        inrix_xd_segments_df.with_columns(
-            (pl.col("Length_Matched") / pl.col("Speed(miles/hour)")).alias(
-                "travel_time"
-            )
-        )
-        # Get total travel time at a particular date_time on a CMP segment
-        .groupby(["CMP_SegID", "Date", "Date_Time"])
-        .agg(pl.sum("Length_Matched"), pl.sum("travel_time"))
-        .join(cmp_segment_conflated_length, on="CMP_SegID", how="left")
-        .with_columns(
-            (pl.col("Length_Matched") / pl.col("travel_time")).alias("Speed"),
-            (100 * pl.col("Length_Matched") / pl.col("CMP_Length")).alias(
-                "spatial_coverage"
-            ),
-        )
+    cmp_period = cmp_segments_datetime_speed_from_inrix(
+        inrix_xd_segments_df, cmp_segment_conflated_length
     )
-
     return (
         pl.from_pandas(
             spatial_coverages(
@@ -511,19 +506,13 @@ def cmp_seg_level_speed_and_los_monthly(
         )
         .with_columns(pl.lit(year).alias("year"))
         .join(
-            pl.from_pandas(
-                cmp_segments_gdf[["cmp_segid", "cls_hcm85", "cls_hcm00"]]
-            ),
+            pl.from_pandas(cmp_segments_gdf[["cmp_segid", "cls_hcm85", "cls_hcm00"]]),
             on="cmp_segid",
             how="left",
         )
         .with_columns(
-            los_1985(pl.col("cls_hcm85"), pl.col("avg_speed")).alias(
-                "los_hcm85"
-            ),
-            los_2000(pl.col("cls_hcm00"), pl.col("avg_speed")).alias(
-                "los_hcm00"
-            ),
+            los_1985(pl.col("cls_hcm85"), pl.col("avg_speed")).alias("los_hcm85"),
+            los_2000(pl.col("cls_hcm00"), pl.col("avg_speed")).alias("los_hcm00"),
         )
         .select(
             "cmp_segid",
@@ -560,42 +549,21 @@ def cmp_seg_level_speed_and_los_biennial(
     """
     groupby_cols = ["CMP_SegID"]
 
-    cmp_period = (
-        inrix_xd_segments_df.with_columns(
-            (pl.col("Length_Matched") / pl.col("Speed(miles/hour)")).alias(
-                "travel_time"
-            )
-        )
-        # Get total travel time at a particular date_time on a CMP segment
-        .groupby(["CMP_SegID", "Date", "Date_Time"])
-        .agg(pl.sum("Length_Matched"), pl.sum("travel_time"))
-        .join(cmp_segment_conflated_length, on="CMP_SegID", how="left")
-        .with_columns(
-            (pl.col("Length_Matched") / pl.col("travel_time")).alias("Speed"),
-            (100 * pl.col("Length_Matched") / pl.col("CMP_Length")).alias(
-                "spatial_coverage"
-            ),
-        )
+    cmp_period = cmp_segments_datetime_speed_from_inrix(
+        inrix_xd_segments_df, cmp_segment_conflated_length
     )
 
     # Use minimum 70% spatial coverage for reliability metric calculation
     cmp_period_r = (
         cmp_period.filter(
-            pl.col("spatial_coverage")
-            >= reliability_spatial_coverage_threshold
+            pl.col("spatial_coverage") >= reliability_spatial_coverage_threshold
         )
-        .groupby(groupby_cols)
+        .group_by(groupby_cols)
         .agg(
             pl.count("Speed").alias("sample_size_rel"),
-            pl.quantile("Speed", 0.05, interpolation="linear").alias(
-                "pcnt5th"
-            ),
-            pl.quantile("Speed", 0.2, interpolation="linear").alias(
-                "pcnt20th"
-            ),
-            pl.quantile("Speed", 0.5, interpolation="linear").alias(
-                "pcnt50th"
-            ),
+            pl.quantile("Speed", 0.05, interpolation="linear").alias("pcnt5th"),
+            pl.quantile("Speed", 0.2, interpolation="linear").alias("pcnt20th"),
+            pl.quantile("Speed", 0.5, interpolation="linear").alias("pcnt50th"),
         )
         .rename({"CMP_SegID": "cmp_segid"})
         .filter(pl.col("sample_size_rel") >= ss_threshold)
@@ -633,19 +601,13 @@ def cmp_seg_level_speed_and_los_biennial(
         )
         .with_columns(pl.lit(year).alias("year"))
         .join(
-            pl.from_pandas(
-                cmp_segments_gdf[["cmp_segid", "cls_hcm85", "cls_hcm00"]]
-            ),
+            pl.from_pandas(cmp_segments_gdf[["cmp_segid", "cls_hcm85", "cls_hcm00"]]),
             on="cmp_segid",
             how="left",
         )
         .with_columns(
-            los_1985(pl.col("cls_hcm85"), pl.col("avg_speed")).alias(
-                "los_hcm85"
-            ),
-            los_2000(pl.col("cls_hcm00"), pl.col("avg_speed")).alias(
-                "los_hcm00"
-            ),
+            los_1985(pl.col("cls_hcm85"), pl.col("avg_speed")).alias("los_hcm85"),
+            los_2000(pl.col("cls_hcm00"), pl.col("avg_speed")).alias("los_hcm00"),
         )
         .join(cmp_period_r, on="cmp_segid", how="left")
         .select(
@@ -681,6 +643,9 @@ def calculate_segments_speed_and_los(
     fcr_avg_spds=None,
 ):
     segments_dfs = []
+    # TODO update to: filter by period, add period column, then concat back to a single
+    # df. After that we can continue with the groupbys (including the period now)
+    # (see sample_size_analysis.py)
     for (
         period,
         period_filter,
@@ -720,9 +685,7 @@ def calculate_segments_speed_and_los(
     return pl.concat(segments_dfs, how="vertical")
 
 
-def process_floating_car_run_speeds(
-    speeds_df, cmp_segment_ids_to_use, year, period
-):
+def process_floating_car_run_speeds(speeds_df, cmp_segment_ids_to_use, year, period):
     return (
         speeds_df.filter(
             (pl.col("period") == period)
@@ -758,23 +721,17 @@ def calculate_reliability_metrics(
         how="left",
     ).with_columns(
         when_inrix.then(
-            pl.max_horizontal(
-                pl.lit(1), (pl.col("refspd_inrix") / pl.col("pcnt5th"))
-            )
+            pl.max_horizontal(pl.lit(1), (pl.col("refspd_inrix") / pl.col("pcnt5th")))
         )
         .otherwise(None)
         .alias("tti95"),
         when_inrix.then(
-            pl.max_horizontal(
-                pl.lit(1), (pl.col("refspd_inrix") / pl.col("pcnt20th"))
-            )
+            pl.max_horizontal(pl.lit(1), (pl.col("refspd_inrix") / pl.col("pcnt20th")))
         )
         .otherwise(None)
         .alias("tti80"),
         when_inrix.then(
-            pl.max_horizontal(
-                pl.lit(0), (pl.col("avg_speed") / pl.col("pcnt5th") - 1)
-            )
+            pl.max_horizontal(pl.lit(0), (pl.col("avg_speed") / pl.col("pcnt5th") - 1))
         )
         .otherwise(None)
         .alias("bi"),
@@ -784,9 +741,7 @@ def calculate_reliability_metrics(
     else:
         return segments_df.with_columns(
             when_inrix.then(
-                pl.max_horizontal(
-                    pl.lit(1), (pl.col("pcnt50th") / pl.col("pcnt20th"))
-                )
+                pl.max_horizontal(pl.lit(1), (pl.col("pcnt50th") / pl.col("pcnt20th")))
             )
             .otherwise(None)
             .alias("lottr")
