@@ -3,7 +3,7 @@ REM Set the path to the TOML file as the first argument
 SET TOML_FILE_PATH=%1
 
 REM Execute Python scripts within the conda environment
-CALL uv run Q:\repos\CMP_Scripts\speed\inrix\sf_inrix_xd_realtime.py "%TOML_FILE_PATH%"
+CALL uv run Q:\repos\CMP_Scripts\speed\inrix\sf_inrix_xd_monthly.py "%TOML_FILE_PATH%"
 CALL uv run Y:\warehouse\scripts\cmprt\aggregate_hourly_expanded_month.py
 CALL uv run Y:\warehouse\scripts\cmprt\aggregate_weekly_expanded_month.py
 CALL uv run Y:\warehouse\scripts\cmprt\import_cmprt_weekly_expanded.py
