@@ -2,6 +2,7 @@
 
 the script ignores actual floating car speed in the raw data
 """
+
 import argparse
 import re
 from pathlib import Path
@@ -21,13 +22,11 @@ def parse_xls(filepath: Path) -> dict:
 
 
 # ignore the run_id at the end
-filename_re_pattern = re.compile("Route #(\d+) ([AP]M)-([NSEW]B)-\d{3}.xls")
+filename_re_pattern = re.compile(r"Route #(\d+) ([AP]M)-([NSEW]B)-\d{3}.xls")
 
 
 def parse_filename(filepath: Path) -> dict:
-    cmp_segid, period, direction = filename_re_pattern.fullmatch(
-        filepath.name
-    ).groups()
+    cmp_segid, period, direction = filename_re_pattern.fullmatch(filepath.name).groups()
     return {
         "cmp_segid": int(cmp_segid),
         "period": period,
@@ -41,9 +40,7 @@ def parse_run(filepath: Path) -> dict:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "directory", help="floating car run raw data directory"
-    )
+    parser.add_argument("directory", help="floating car run raw data directory")
     # parser.add_argument(
     #     "year", help="year of data collection (for filename and year column)"
     # )
@@ -60,28 +57,24 @@ if __name__ == "__main__":
             [parse_run(p) for p in dir.rglob("*.xls")]
             # schema_overrides={"cmp_segid": pl.Int}
         )
+        .with_columns(pl.col("t_i", "t_f").str.to_datetime("%m/%d/%y %H:%M:%S"))
         .with_columns(
-            pl.col("t_i", "t_f").str.to_datetime("%m/%d/%y %H:%M:%S")
-        )
-        .with_columns(
-            (pl.col("t_f") - pl.col("t_i")).dt.seconds().alias("travel_time_s")
+            (pl.col("t_f") - pl.col("t_i")).dt.total_seconds().alias("travel_time_s")
         )
         .join(pl.from_pandas(cmp_seg_lengths), on="cmp_segid", how="left")
         .with_columns(
-            (3600 * pl.col("length") / pl.col("travel_time_s"))
-            .round(3)
-            .alias("speed")
+            (3600 * pl.col("length") / pl.col("travel_time_s")).round(3).alias("speed")
         )
-        .groupby(["cmp_segid", "period", "direction"])
+        .group_by(["cmp_segid", "period", "direction"])
         .agg(
-            pl.mean("speed").prefix("avg_"),
-            pl.std("speed").prefix("std_"),
-            pl.min("speed").prefix("min_"),
-            pl.max("speed").prefix("max_"),
+            pl.mean("speed").name.prefix("avg_"),
+            pl.std("speed").name.prefix("std_"),
+            pl.min("speed").name.prefix("min_"),
+            pl.max("speed").name.prefix("max_"),
             pl.count("speed").alias("sample_size"),
         )
         .sort("cmp_segid", "period")
         # .with_columns(pl.lit(args.year).alias("year"))
-        .write_csv(dir / ".." / f"floating_car-speed-summary_stats.csv")
-        # dir / ".." / f"floating_car-speed-summary_stats.csv-{args.year}.csv"
+        .write_csv(dir / ".." / "floating_car-speed-summary_stats.csv")
+        # dir / ".." / f"floating_car-speed-summary_stats-{args.year}.csv"
     )
