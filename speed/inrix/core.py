@@ -90,8 +90,10 @@ def read_cmp_inrix_conflation(filepath):
     """read CMP-INRIX segment correspondence table"""
     conflation_df = pl.read_csv(filepath)
     cmp_segment_conflated_length = conflation_df.group_by("CMP_SegID").agg(
-        pl.sum("Length_Matched").alias("CMP_Length")
+        cmp_segment_conflated_length=pl.sum("Length_Matched")
     )
+    # TODO cmp_segment_conflated_length should be calculated with the conflation script
+    # and just joined directly to the conflation CSV file
     return conflation_df, cmp_segment_conflated_length
 
 
@@ -144,7 +146,16 @@ def read_inrix_xd_zip(zip_filepath):
     # seems like polars cannot handle reading zip CSVs via fsspec:
     with ZipFile(zip_filepath) as z:
         with z.open(f"{_zip_hashdir(zip_filepath)}/data.csv", mode="r") as f:
-            return pl.read_csv(f.read(), columns=columns)  # , dtypes=dtypes)
+            return pl.read_csv(
+                f.read(),
+                columns=columns,
+                schema_overrides={
+                    "Date Time": pl.String,
+                    "Segment ID": pl.UInt64,
+                    "Speed(miles/hour)": pl.UInt8,
+                    "Ref Speed(miles/hour)": pl.UInt8,
+                },
+            )
 
 
 def read_filtered_inrix_xd_zips(zip_filepaths, inrix_xd_segment_ids_to_keep):
@@ -460,13 +471,13 @@ def cmp_segments_datetime_speed_from_inrix(
                 "travel_time"
             )
         )
-        .group_by(["CMP_SegID", "Date", "Date_Time"])
+        .group_by(["CMP_SegID", "date", "datetime"])
         .agg(pl.sum("Length_Matched"), pl.sum("travel_time"))
         .join(cmp_segment_conflated_length, on="CMP_SegID", how="left")
         .with_columns(
-            (pl.col("Length_Matched") / pl.col("travel_time")).alias("Speed"),
-            (100 * pl.col("Length_Matched") / pl.col("CMP_Length")).alias(
-                "spatial_coverage"
+            Speed=(pl.col("Length_Matched") / pl.col("travel_time")),
+            spatial_coverage=(
+                100 * pl.col("Length_Matched") / pl.col("cmp_segment_conflated_length")
             ),
         )
     )
@@ -484,7 +495,7 @@ def cmp_seg_level_speed_and_los_monthly(
     """
     Calculate CMP segment level average speeds, LOS, and reliability metrics
     """
-    groupby_cols = ["CMP_SegID", "Date"]
+    groupby_cols = ["CMP_SegID", "date"]
 
     cmp_period = cmp_segments_datetime_speed_from_inrix(
         inrix_xd_segments_df, cmp_segment_conflated_length
@@ -643,8 +654,9 @@ def calculate_segments_speed_and_los(
     fcr_avg_spds=None,
 ):
     segments_dfs = []
-    # TODO update to: filter by period, add period column, then concat back to a single
-    # df. After that we can continue with the groupbys (including the period now)
+    # TODO update to: add period column, then do calculations over the rows of each
+    # period, then no need to concat back together.
+    # After that we can continue with the groupbys (including the period now)
     # (see sample_size_analysis.py)
     for (
         period,
