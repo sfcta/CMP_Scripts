@@ -44,7 +44,7 @@ def read_bayarea_xd_segments(
     gdf["XDSegID"] = gdf["XDSegID"].astype(int)
     if sf_only:
         # filter for segments in SF only
-        gdf = gdf[gdf.County == "SAN FRANCISCO"]
+        gdf = gdf[gdf.County == "San Francisco"]
     return gdf
 
 
