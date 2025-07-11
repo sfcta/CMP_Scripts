@@ -28,6 +28,15 @@ def is_weekday(dayofweek: str):
         raise ValueError(f"{dayofweek} unrecognized.")
 
 
+def is_tuetothu(dayofweek: str):
+    if dayofweek in {"TUESDAY", "WEDNESDAY", "THURSDAY"}:
+        return True
+    elif dayofweek in {"MONDAY", "FRIDAY", "SATURDAY", "SUNDAY"}:
+        return False
+    else:
+        raise ValueError(f"{dayofweek} unrecognized.")
+
+
 def read_day_dir_counts_df(filepath, sheet_name, direction, day_num):
     """Read the counts table from a single day and direction
 
@@ -138,7 +147,7 @@ def read_day_total(workbook, sheet_name, direction, day_num):
         return total
 
 
-def read_totals(filepath, workbook, sheet_name, direction, weekday_only=True):
+def read_totals(filepath, workbook, sheet_name, direction, dow_mode):
     """_summary_
 
     Note that filepath and workbook are both needed because pandas is used to
@@ -161,6 +170,8 @@ def read_totals(filepath, workbook, sheet_name, direction, weekday_only=True):
     _type_
         _description_
     """
+    if dow_mode not in {"tuetothu", "anyweekday", "anyday"}:
+        raise KeyError("dow_mode should be tuetothu, anyweekday, or anyday")
     day_num = -1
     am_peak_totals = []
     pm_peak_totals = []
@@ -168,16 +179,18 @@ def read_totals(filepath, workbook, sheet_name, direction, weekday_only=True):
     while True:
         day_num += 1
         try:
-            if weekday_only and not is_weekday(
-                read_day_dir_dayofweek(workbook, sheet_name, day_num)
+            dow = read_day_dir_dayofweek(workbook, sheet_name, day_num)
+            if (
+                (dow_mode == "anyday")
+                or ((dow_mode == "anyweekday") and is_weekday(dow))
+                or ((dow_mode == "tuetothu") and is_tuetothu(dow))
             ):
-                continue
-            df = read_day_dir_counts_df(filepath, sheet_name, direction, day_num)
-            am_peak_totals.append(get_am_peak_totals(df))
-            pm_peak_totals.append(get_pm_peak_totals(df))
-            daily_totals.append(
-                read_day_total(workbook, sheet_name, direction, day_num)
-            )
+                df = read_day_dir_counts_df(filepath, sheet_name, direction, day_num)
+                am_peak_totals.append(get_am_peak_totals(df))
+                pm_peak_totals.append(get_pm_peak_totals(df))
+                daily_totals.append(
+                    read_day_total(workbook, sheet_name, direction, day_num)
+                )
         except EOFError:  # assume we've reached the end of the sheet
             break
     return am_peak_totals, pm_peak_totals, daily_totals
@@ -190,9 +203,7 @@ def read_sheet_directions(workbook, sheet_name):
     )
 
 
-def read_sheet_mean_totals(
-    filepath, workbook, sheet_name, raw_values=False, weekday_only=True
-):
+def read_sheet_mean_totals(filepath, workbook, sheet_name, dow_mode, raw_values=False):
     """Read count totals (i.e. volumes) from a single worksheet
 
     This is where we start referring to totals as volumes
@@ -216,11 +227,13 @@ def read_sheet_mean_totals(
     # avg daily total (in each direction)
     vols_dir0 = map(
         np.mean,
-        read_totals(filepath, workbook, sheet_name, 0, weekday_only=weekday_only),
+        read_totals(filepath, workbook, sheet_name, 0, dow_mode),
     )
     rows = [[sheet_name, dir0, *vols_dir0]]
     if dir1 != "O":
-        vols_dir1 = map(np.mean, read_totals(filepath, workbook, sheet_name, 1))
+        vols_dir1 = map(
+            np.mean, read_totals(filepath, workbook, sheet_name, 1, dow_mode)
+        )
         rows.append([sheet_name, dir1, *vols_dir1])
     if raw_values:
         return rows
@@ -238,13 +251,12 @@ def read_sheet_mean_totals(
         )
 
 
-def read_xlsxs_volumes(xlsx_filepaths, weekday_only=True):
-    return pd.concat(
-        read_xlsx_volumes(f, weekday_only=weekday_only) for f in xlsx_filepaths
-    )
+def read_xlsxs_volumes(xlsx_filepaths, dow_mode):
+    return pl.concat(read_xlsx_volumes(f, dow_mode) for f in xlsx_filepaths)
 
 
-def read_xlsx_volumes(filepath, weekday_only=True):
+def read_xlsx_volumes(filepath, dow_mode):
+    print("parsing file:", filepath)
     wb = load_workbook(filename=filepath, read_only=True)
     column_names = (
         "sheet_name",
@@ -254,69 +266,75 @@ def read_xlsx_volumes(filepath, weekday_only=True):
         "daily_vol",
     )
     count_totals = []
-    sheet_names = [sn for sn in wb.sheetnames if not sn.endswith("PHOTO")]
+    sheet_names = [sn for sn in wb.sheetnames if not sn.lower().endswith("photo")]
     for sheet_name in sheet_names:
-        print("parsing sheet", sheet_name)
+        print("parsing sheet:", sheet_name)
         count_totals.extend(
             read_sheet_mean_totals(
                 filepath,
                 wb,
                 sheet_name,
+                dow_mode,
                 raw_values=True,
-                weekday_only=weekday_only,
             )
         )
-    return pd.DataFrame(
-        count_totals,
-        columns=column_names,
-    )
+    return pl.DataFrame(count_totals, schema=column_names, orient="row")
 
 
 def add_cmp_non_peak_volume(volumes_df):
-    volumes_df["cmp_non_peak_vol"] = (
-        volumes_df["daily_vol"]
-        - volumes_df["cmp_am_peak_vol"]
-        - volumes_df["cmp_pm_peak_vol"]
+    return volumes_df.with_columns(
+        cmp_non_peak_vol=(
+            pl.col("daily_vol") - pl.col("cmp_am_peak_vol") - pl.col("cmp_pm_peak_vol")
+        )
     )
-    return volumes_df
 
 
 def rename_sheet_name_to_location(volumes_df, locations_filepath):
-    locations = {
-        k: v[0][0]
-        for k, v in (
-            pl.read_csv(locations_filepath, columns=["2023_location_id", "location"])
-            .unique()  # some locations (and location IDs) have both directions
-            .rows_by_key("2023_location_id")
-        ).items()
-    }
-    volumes_df["2023_location_id"] = (
-        # split on "-" or " "
-        volumes_df["sheet_name"].str.split(r"[-\s]", expand=True)[1].astype(int)
+    locations = pl.read_csv(
+        locations_filepath,
+        columns=["id_nodir_2023", "id_withdir_2023", "name_2023", "direction"],
+    ).rename(
+        {
+            "id_nodir_2023": "location_id_nodir_2023",
+            "id_withdir_2023": "location_id_withdir_2023",
+            "name_2023": "location",
+        }
     )
-    volumes_df["location"] = volumes_df["2023_location_id"].map(locations)
-    # reorder columns and drop sheet_name
-    return volumes_df[
-        [
-            "2023_location_id",
+    return (
+        volumes_df.with_columns(
+            location_id_nodir_2023=pl.col("sheet_name")
+            .str.replace(" ", "-")
+            # str.split can't handle regex as of polars v1
+            # r"[-\\s]+"  # split on "-" or " "
+            .str.split("-")
+            .list.get(1)
+            .cast(int)
+        )
+        .join(locations, on=["location_id_nodir_2023", "direction"])
+        .select(  # reorder columns and drop sheet_name
+            "location_id_nodir_2023",
+            "location_id_withdir_2023",
             "location",
             "direction",
             "cmp_am_peak_vol",
             "cmp_pm_peak_vol",
             "cmp_non_peak_vol",
             "daily_vol",
-        ]
-    ]
+        )
+    )
 
 
-def parse_wiltec_excel(raw_xlsx_filepaths, locations_filepath, output_csv_filepath):
+def parse_wiltec_excel(
+    raw_xlsx_filepaths, locations_filepath, output_csv_filepath_stem, dow_mode
+):
+    output_csv_filepath = f"{output_csv_filepath_stem}-{dow_mode}.csv"
+    print("day of week mode:", dow_mode)
     print("parsing workbooks", list(raw_xlsx_filepaths))
+    print("output filepath:", output_csv_filepath)
     rename_sheet_name_to_location(
-        add_cmp_non_peak_volume(
-            read_xlsxs_volumes(raw_xlsx_filepaths, weekday_only=True)
-        ),
+        add_cmp_non_peak_volume(read_xlsxs_volumes(raw_xlsx_filepaths, dow_mode)),
         locations_filepath,
-    ).to_csv(output_csv_filepath, index=False)
+    ).write_csv(output_csv_filepath)
 
 
 if __name__ == "__main__":
@@ -331,8 +349,11 @@ if __name__ == "__main__":
             "check location IDs and raw_xlsx sheet numbers match"
         ),
     )
-    parser.add_argument("output_csv_filepath", help="Output CSV filepath")
+    parser.add_argument("output_csv_filepath_stem", help="Output CSV filepath stem")
     args = parser.parse_args()
+
+    dow_mode = "tuetothu"  # day of week mode: tuetothu, anyweekday, anyday
+    # anyweekday was used for CMP 2023, tuetothu used from CMP2025 onwards
 
     raw_xlsx_glob_filepaths = Path(args.raw_xlsx_glob_filepaths)
     raw_xlsx_filepaths = list(
@@ -341,5 +362,6 @@ if __name__ == "__main__":
     parse_wiltec_excel(
         raw_xlsx_filepaths,
         args.locations_filepath,
-        args.output_csv_filepath,
+        args.output_csv_filepath_stem,
+        dow_mode,
     )
