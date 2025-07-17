@@ -8,16 +8,16 @@ INPUTS:
 state of California, only roadways in San Francisco County are selected and exported as inrix_xd_sf.shp.
 
 OUTPUTS:
-1. cmp_roadway_segments_matchedlength_check.shp, a shapefile generated for quality check purpose. The field "Len_Ratio" indicates the 
-ratio of the total length of matched INRIX links over the length of the CMP segment. Special attention should should be given to 
-segments whose Len_Ratio is below 95% or over 100%. 
+1. cmp_roadway_segments_matchedlength_check.shp, a shapefile generated for quality check purpose. The field "Len_Ratio" indicates the
+ratio of the total length of matched INRIX links over the length of the CMP segment. Special attention should should be given to
+segments whose Len_Ratio is below 95% or over 100%.
 2. CMP_Segment_INRIX_Links_Correspondence.csv, a csv file containing the correspondence between CMP segments and INRIX XD links. The
-field "Length_Matched" indicates the length of an INRIX link matched to a CMP segment. Note that the table is not final as quality 
-assurance needs to be performed on the conflation results and necessary changes could be made. Please see 
+field "Length_Matched" indicates the length of an INRIX link matched to a CMP segment. Note that the table is not final as quality
+assurance needs to be performed on the conflation results and necessary changes could be made. Please see
 Network Conflation Process Memo.docx for more detailed discussions.
 
 USAGE:
-To use the script, place the script under the same folder with input files and run with following command: 
+To use the script, place the script under the same folder with input files and run with following command:
 python SF_CMP_INRIX_Network_Conflation.py
 """
 
@@ -25,7 +25,8 @@ MAP_VER = 2301
 
 # Specify input file names
 # INRIX XD network
-inrix_sf = f"INRIX_XD-SF-{MAP_VER}"  # .gpkg'  # HOTFIX, leaving the extension hardcoded below
+# HOTFIX, leaving the extension hardcoded below
+inrix_sf = f"INRIX_XD-SF-{MAP_VER}"  # .gpkg'
 segid_col = "XDSegID"
 # CMP network
 # CMP network (as in the reports)
@@ -161,9 +162,7 @@ with fiona.open(
 endpoints = gp.read_file(inrix_sf + "_prj_endpoints.shp")
 
 # Assign unique node id
-endpoints_cnt = (
-    endpoints.groupby(["Latitude", "Longitude"]).SegID.count().reset_index()
-)
+endpoints_cnt = endpoints.groupby(["Latitude", "Longitude"]).SegID.count().reset_index()
 endpoints_cnt.rename(columns={"SegID": "NodeCnt"}, inplace=True)
 endpoints_cnt["NodeID"] = endpoints_cnt.index + 1
 
@@ -175,9 +174,7 @@ endpoints_cnt["Coordinates"] = endpoints_cnt["Coordinates"].apply(Point)
 endpoints_cnt_gpd = gp.GeoDataFrame(endpoints_cnt, geometry="Coordinates")
 endpoints_cnt_gpd.to_file(inrix_sf + "_prj_endpoints_unique.shp")
 
-endpoints = endpoints.merge(
-    endpoints_cnt, on=["Latitude", "Longitude"], how="left"
-)
+endpoints = endpoints.merge(endpoints_cnt, on=["Latitude", "Longitude"], how="left")
 
 # Attached the endpoint information to the link network
 endpoints_begin = endpoints[endpoints["type"] == "begin"][
@@ -316,9 +313,7 @@ inrix_lines_intersect = gp.sjoin(
 ).reset_index()
 
 # INRIX lines within cmp segment buffer zone
-inrix_lines_within = gp.sjoin(
-    inrix_net_prj, cmp_segs_buffer, op="within"
-).reset_index()
+inrix_lines_within = gp.sjoin(inrix_net_prj, cmp_segs_buffer, op="within").reset_index()
 
 
 # ## Determine matching INRIX links within each CMP buffer
@@ -375,9 +370,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
     if cmp_seg_id == 175:
         cmp_names = ["mission street", "otis street"]
 
-    inrix_lns_within = inrix_lines_within[
-        inrix_lines_within["cmp_segid"] == cmp_seg_id
-    ]
+    inrix_lns_within = inrix_lines_within[inrix_lines_within["cmp_segid"] == cmp_seg_id]
     inrix_lns_idx = inrix_lines_within.index[
         inrix_lines_within["cmp_segid"] == cmp_seg_id
     ].tolist()
@@ -388,30 +381,22 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
             inrix_e_lat = inrix_lines_within.loc[ln_idx]["E_Lat_left"]
             inrix_e_long = inrix_lines_within.loc[ln_idx]["E_Long_left"]
             inrix_geo = inrix_lines_within.loc[ln_idx]["geometry"]
-            inrix_len = (
-                inrix_lines_within.loc[ln_idx]["Miles"] * 5280
-            )  # miles to feet
+            inrix_len = inrix_lines_within.loc[ln_idx]["Miles"] * 5280  # miles to feet
 
             if pd.notnull(inrix_lines_within.loc[ln_idx]["RoadName"]):
                 inrix_roadname = (
-                    inrix_lines_within.loc[ln_idx]["RoadName"]
-                    .lower()
-                    .split("/")
+                    inrix_lines_within.loc[ln_idx]["RoadName"].lower().split("/")
                 )  # Street name
             else:
                 inrix_roadname = []
             if pd.notnull(inrix_lines_within.loc[ln_idx]["RoadNumber"]):
                 inrix_roadnumber = (
-                    inrix_lines_within.loc[ln_idx]["RoadNumber"]
-                    .lower()
-                    .split("/")
+                    inrix_lines_within.loc[ln_idx]["RoadNumber"].lower().split("/")
                 )
                 inrix_roadname = inrix_roadname + inrix_roadnumber
             if pd.notnull(inrix_lines_within.loc[ln_idx]["RoadList"]):
                 inrix_roadlist = (
-                    inrix_lines_within.loc[ln_idx]["RoadList"]
-                    .lower()
-                    .split("/")
+                    inrix_lines_within.loc[ln_idx]["RoadList"].lower().split("/")
                 )
                 inrix_roadname = inrix_roadname + inrix_roadlist
             inrix_roadname = list(set(inrix_roadname))
@@ -439,17 +424,13 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
 
             inrix_e_point = Point(float(inrix_e_long), float(inrix_e_lat))
             inrix_e_dis = cmp_seg_geo.project(inrix_e_point)
-            inrix_lines_within.loc[ln_idx, "INRIX_E_Loc"] = (
-                inrix_e_dis * 3.2808
-            )
+            inrix_lines_within.loc[ln_idx, "INRIX_E_Loc"] = inrix_e_dis * 3.2808
             inrix_e_projected = cmp_seg_geo.interpolate(
                 inrix_e_dis
             )  # projected inrix end point on cmp segment
 
             inrix_b_e_dis = (inrix_e_dis - inrix_b_dis) * 3.2808
-            inrix_lines_within.loc[ln_idx, "INX_B_CMP_B"] = (
-                inrix_b_dis * 3.2808
-            )
+            inrix_lines_within.loc[ln_idx, "INX_B_CMP_B"] = inrix_b_dis * 3.2808
             inrix_lines_within.loc[ln_idx, "INX_E_CMP_E"] = (
                 cmp_seg_len - inrix_e_dis * 3.2808
             )
@@ -477,9 +458,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                     inrix_lines_within.loc[ln_idx, "Matching"] = "No"
                     continue
                 cmp_e_projected = inrix_geo.interpolate(cmp_e_inrix_b_dis)
-                projected_len_ratio = abs(inrix_b_e_dis) / (
-                    cmp_e_inrix_b_dis * 3.2808
-                )
+                projected_len_ratio = abs(inrix_b_e_dis) / (cmp_e_inrix_b_dis * 3.2808)
             else:
                 # INRIX link in between cmp endpoints
                 projected_len_ratio = abs(inrix_b_e_dis) / inrix_len
@@ -544,17 +523,11 @@ inrix_lines_matched_final = inrix_lines_matched[cols]
 
 # Calculate the total length of INRIX links that have been matched
 inrix_matched_length = (
-    inrix_lines_matched_final.groupby("cmp_segid")
-    .Length_Matched.sum()
-    .reset_index()
+    inrix_lines_matched_final.groupby("cmp_segid").Length_Matched.sum().reset_index()
 )
 inrix_matched_length.columns = ["cmp_segid", "Len_Matched"]
-inrix_matched_length["cmp_segid"] = inrix_matched_length["cmp_segid"].astype(
-    int
-)
-cmp_segs_prj = cmp_segs_prj.merge(
-    inrix_matched_length, on="cmp_segid", how="left"
-)
+inrix_matched_length["cmp_segid"] = inrix_matched_length["cmp_segid"].astype(int)
+cmp_segs_prj = cmp_segs_prj.merge(inrix_matched_length, on="cmp_segid", how="left")
 
 # Calculate the ratio of the total length of matched INRIX links to the CMP segment length
 cmp_segs_prj["Len_Ratio"] = np.where(
@@ -597,9 +570,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
             cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = "Yes"
         else:
             # Need find previous links
-            preNode = inrix_lines_matched_final.loc[inrix_matched_first_idx][
-                "B_NodeID"
-            ]
+            preNode = inrix_lines_matched_final.loc[inrix_matched_first_idx]["B_NodeID"]
             found = 0
             matched = 0
             GAP_COUNTER = 0
@@ -620,24 +591,18 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                     & (inrix_lines_intersect["E_NodeID"] == preNode)
                 ]
                 if len(preLinks) == 0:
-                    cmp_segs_prj.loc[
-                        cmp_seg_idx, "CMP_B_Indt"
-                    ] = "Previous links not found"
+                    cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = (
+                        "Previous links not found"
+                    )
                     break
                 else:
                     preLinks_idx = preLinks.index.tolist()
                     for prelink_idx in preLinks_idx:
-                        prelink_geo = inrix_lines_intersect.loc[prelink_idx][
-                            "geometry"
-                        ]
+                        prelink_geo = inrix_lines_intersect.loc[prelink_idx]["geometry"]
                         prelink_b_lat = preLinks.loc[prelink_idx]["B_Lat_left"]
-                        prelink_b_long = preLinks.loc[prelink_idx][
-                            "B_Long_left"
-                        ]
+                        prelink_b_long = preLinks.loc[prelink_idx]["B_Long_left"]
                         prelink_e_lat = preLinks.loc[prelink_idx]["E_Lat_left"]
-                        prelink_e_long = preLinks.loc[prelink_idx][
-                            "E_Long_left"
-                        ]
+                        prelink_e_long = preLinks.loc[prelink_idx]["E_Long_left"]
                         prelink_len = (
                             preLinks.loc[prelink_idx]["Miles"] * 5280
                         )  # miles to feet
@@ -648,9 +613,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             prelink_b_point = Point(
                                 float(prelink_b_long), float(prelink_b_lat)
                             )
-                            prelink_b_dis = cmp_seg_geo.project(
-                                prelink_b_point
-                            )
+                            prelink_b_dis = cmp_seg_geo.project(prelink_b_point)
                             preLinks.loc[prelink_idx, "INRIX_B_Loc"] = (
                                 prelink_b_dis * 3.2808
                             )
@@ -661,9 +624,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             prelink_e_point = Point(
                                 float(prelink_e_long), float(prelink_e_lat)
                             )
-                            prelink_e_dis = cmp_seg_geo.project(
-                                prelink_e_point
-                            )
+                            prelink_e_dis = cmp_seg_geo.project(prelink_e_point)
                             preLinks.loc[prelink_idx, "INRIX_E_Loc"] = (
                                 prelink_e_dis * 3.2808
                             )
@@ -678,15 +639,11 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                 cmp_seg_len - prelink_e_dis * 3.2808
                             )  # meters to feet
 
-                            prelink_b_e_dis = (
-                                prelink_e_dis - prelink_b_dis
-                            ) * 3.2808
-                            projected_len_ratio = (
-                                abs(prelink_b_e_dis) / prelink_len
+                            prelink_b_e_dis = (prelink_e_dis - prelink_b_dis) * 3.2808
+                            projected_len_ratio = abs(prelink_b_e_dis) / prelink_len
+                            preLinks.loc[prelink_idx, "Proj_Ratio"] = (
+                                projected_len_ratio
                             )
-                            preLinks.loc[
-                                prelink_idx, "Proj_Ratio"
-                            ] = projected_len_ratio
 
                             prelink_degree = (180 / math.pi) * math.atan2(
                                 prelink_e_long - prelink_b_long,
@@ -695,67 +652,54 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             # Ensure the degree is calculated following the original direction
                             if prelink_e_dis > prelink_b_dis:
                                 cmp_degree = (180 / math.pi) * math.atan2(
-                                    prelink_e_projected.x
-                                    - prelink_b_projected.x,
-                                    prelink_e_projected.y
-                                    - prelink_b_projected.y,
+                                    prelink_e_projected.x - prelink_b_projected.x,
+                                    prelink_e_projected.y - prelink_b_projected.y,
                                 )
                             else:
                                 cmp_degree = (180 / math.pi) * math.atan2(
-                                    prelink_b_projected.x
-                                    - prelink_e_projected.x,
-                                    prelink_b_projected.y
-                                    - prelink_e_projected.y,
+                                    prelink_b_projected.x - prelink_e_projected.x,
+                                    prelink_b_projected.y - prelink_e_projected.y,
                                 )
 
-                            prelink_cmp_angle = abs(
-                                cmp_degree - prelink_degree
-                            )
+                            prelink_cmp_angle = abs(cmp_degree - prelink_degree)
                             if prelink_cmp_angle > 270:
                                 prelink_cmp_angle = 360 - prelink_cmp_angle
-                            preLinks.loc[
-                                prelink_idx, "Proj_Angle"
-                            ] = prelink_cmp_angle
+                            preLinks.loc[prelink_idx, "Proj_Angle"] = prelink_cmp_angle
 
                             if (projected_len_ratio > len_ratio_thrhd) & (
                                 prelink_cmp_angle < angle_thrhd
                             ):
                                 found = 1
                                 cur_cnt = len(inrix_lines_matched_final)
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "SegID"
-                                ] = preLinks.loc[prelink_idx]["SegID"]
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "PreviousSe"
-                                ] = preLinks.loc[prelink_idx]["PreviousSe"]
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "NextSegID"
-                                ] = preLinks.loc[prelink_idx]["NextSegID"]
+                                inrix_lines_matched_final.loc[cur_cnt, "SegID"] = (
+                                    preLinks.loc[prelink_idx]["SegID"]
+                                )
+                                inrix_lines_matched_final.loc[cur_cnt, "PreviousSe"] = (
+                                    preLinks.loc[prelink_idx]["PreviousSe"]
+                                )
+                                inrix_lines_matched_final.loc[cur_cnt, "NextSegID"] = (
+                                    preLinks.loc[prelink_idx]["NextSegID"]
+                                )
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "Length_Matched"
                                 ] = prelink_b_e_dis
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "cmp_segid"
-                                ] = cmp_seg_id
+                                inrix_lines_matched_final.loc[cur_cnt, "cmp_segid"] = (
+                                    cmp_seg_id
+                                )
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INRIX_B_Loc"
-                                ] = (prelink_b_dis * 3.2808)
+                                ] = prelink_b_dis * 3.2808
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INRIX_E_Loc"
-                                ] = (prelink_e_dis * 3.2808)
+                                ] = prelink_e_dis * 3.2808
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INX_B_CMP_B"
-                                ] = (prelink_b_dis * 3.2808)
+                                ] = prelink_b_dis * 3.2808
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INX_E_CMP_E"
-                                ] = (cmp_seg_len - prelink_e_dis * 3.2808)
-                                inrix_matched_first_b_dis = (
-                                    prelink_b_dis * 3.2808
-                                )
-                                if (
-                                    inrix_matched_first_b_dis / cmp_seg_len
-                                    < gap_thrhd
-                                ):
+                                ] = cmp_seg_len - prelink_e_dis * 3.2808
+                                inrix_matched_first_b_dis = prelink_b_dis * 3.2808
+                                if inrix_matched_first_b_dis / cmp_seg_len < gap_thrhd:
                                     matched = 1
                                 preNode = preLinks.loc[prelink_idx]["B_NodeID"]
                                 break
@@ -777,9 +721,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                 prelink_e_cmp_b_dis
                             )  # projected prelink end point on cmp segment
 
-                            cmp_b_point = Point(
-                                float(cmp_b_long), float(cmp_b_lat)
-                            )
+                            cmp_b_point = Point(float(cmp_b_long), float(cmp_b_lat))
                             cmp_b_dis = prelink_geo.project(
                                 cmp_b_point
                             )  # distance from inrix prelink to cmp begin point
@@ -791,14 +733,12 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             )  # projected cmp begin point on intersecting inrix link
 
                             projected_len_ratio = min(
-                                cmp_b_prelink_e_dis
-                                / (prelink_e_cmp_b_dis * 3.2808),
-                                (prelink_e_cmp_b_dis * 3.2808)
-                                / cmp_b_prelink_e_dis,
+                                cmp_b_prelink_e_dis / (prelink_e_cmp_b_dis * 3.2808),
+                                (prelink_e_cmp_b_dis * 3.2808) / cmp_b_prelink_e_dis,
                             )
-                            preLinks.loc[
-                                prelink_idx, "Proj_Ratio"
-                            ] = projected_len_ratio
+                            preLinks.loc[prelink_idx, "Proj_Ratio"] = (
+                                projected_len_ratio
+                            )
 
                             prelink_degree = (180 / math.pi) * math.atan2(
                                 prelink_e_long - cmp_b_projected.x,
@@ -808,14 +748,10 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                 prelink_e_projected.x - cmp_b_long,
                                 prelink_e_projected.y - cmp_b_lat,
                             )
-                            prelink_cmp_angle = abs(
-                                cmp_degree - prelink_degree
-                            )
+                            prelink_cmp_angle = abs(cmp_degree - prelink_degree)
                             if prelink_cmp_angle > 270:
                                 prelink_cmp_angle = 360 - prelink_cmp_angle
-                            preLinks.loc[
-                                prelink_idx, "Proj_Angle"
-                            ] = prelink_cmp_angle
+                            preLinks.loc[prelink_idx, "Proj_Angle"] = prelink_cmp_angle
 
                             if (projected_len_ratio > len_ratio_thrhd) & (
                                 prelink_cmp_angle < angle_thrhd
@@ -823,29 +759,27 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                 found = 1
                                 matched = 1
                                 cur_cnt = len(inrix_lines_matched_final)
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "SegID"
-                                ] = preLinks.loc[prelink_idx]["SegID"]
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "PreviousSe"
-                                ] = preLinks.loc[prelink_idx]["PreviousSe"]
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "NextSegID"
-                                ] = preLinks.loc[prelink_idx]["NextSegID"]
+                                inrix_lines_matched_final.loc[cur_cnt, "SegID"] = (
+                                    preLinks.loc[prelink_idx]["SegID"]
+                                )
+                                inrix_lines_matched_final.loc[cur_cnt, "PreviousSe"] = (
+                                    preLinks.loc[prelink_idx]["PreviousSe"]
+                                )
+                                inrix_lines_matched_final.loc[cur_cnt, "NextSegID"] = (
+                                    preLinks.loc[prelink_idx]["NextSegID"]
+                                )
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "Length_Matched"
-                                ] = (prelink_e_cmp_b_dis * 3.2808)
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "cmp_segid"
-                                ] = cmp_seg_id
+                                ] = prelink_e_cmp_b_dis * 3.2808
+                                inrix_lines_matched_final.loc[cur_cnt, "cmp_segid"] = (
+                                    cmp_seg_id
+                                )
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INRIX_B_Loc"
                                 ] = 0
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INRIX_E_Loc"
-                                ] = (
-                                    prelink_e_cmp_b_dis * 3.2808
-                                )  # meters to feet
+                                ] = prelink_e_cmp_b_dis * 3.2808  # meters to feet
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INX_B_CMP_B"
                                 ] = 0
@@ -859,21 +793,19 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             else:
                                 preLinks.loc[prelink_idx, "Matching"] = "No"
                     if matched == 1:
-                        cmp_segs_prj.loc[
-                            cmp_seg_idx, "CMP_B_Indt"
-                        ] = "Yes-LinkAdded"
+                        cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = "Yes-LinkAdded"
                     if (
                         found == 0
                     ):  # break while loop if no mathcing link found in prelinks
-                        cmp_segs_prj.loc[
-                            cmp_seg_idx, "CMP_B_Indt"
-                        ] = "No Matching Previous Link"
+                        cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = (
+                            "No Matching Previous Link"
+                        )
                         break
 
         # Search forward to maintain the sequence along the traveling direction
-        inrix_matched_e_dis = inrix_lines_matched_final.loc[
-            inrix_matched_first_idx
-        ]["INX_E_CMP_E"]
+        inrix_matched_e_dis = inrix_lines_matched_final.loc[inrix_matched_first_idx][
+            "INX_E_CMP_E"
+        ]
         if inrix_matched_e_dis / cmp_seg_len < gap_thrhd:
             cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = "Yes"
         else:
@@ -896,11 +828,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                     )
                     break
                 if (
-                    len(
-                        inrix_lns_matched[
-                            inrix_lns_matched["B_NodeID"] == nextNode
-                        ]
-                    )
+                    len(inrix_lns_matched[inrix_lns_matched["B_NodeID"] == nextNode])
                     == 1
                 ):
                     matched_link_next = inrix_lns_matched[
@@ -909,11 +837,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                     inrix_matched_e_dis = matched_link_next.INX_E_CMP_E.item()
                     nextNode = matched_link_next.E_NodeID.item()
                 elif (
-                    len(
-                        inrix_lns_matched[
-                            inrix_lns_matched["B_NodeID"] == nextNode
-                        ]
-                    )
+                    len(inrix_lns_matched[inrix_lns_matched["B_NodeID"] == nextNode])
                     > 1
                 ):
                     break
@@ -923,28 +847,20 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                         & (inrix_lines_intersect["B_NodeID"] == nextNode)
                     ]
                     if len(nextLinks) == 0:
-                        cmp_segs_prj.loc[
-                            cmp_seg_idx, "CMP_E_Indt"
-                        ] = "Next links not found"
+                        cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = (
+                            "Next links not found"
+                        )
                         break
                     else:
                         nextLinks_idx = nextLinks.index.tolist()
                         for nextlink_idx in nextLinks_idx:
-                            nextlink_geo = inrix_lines_intersect.loc[
-                                nextlink_idx
-                            ]["geometry"]
-                            nextlink_b_lat = nextLinks.loc[nextlink_idx][
-                                "B_Lat_left"
+                            nextlink_geo = inrix_lines_intersect.loc[nextlink_idx][
+                                "geometry"
                             ]
-                            nextlink_b_long = nextLinks.loc[nextlink_idx][
-                                "B_Long_left"
-                            ]
-                            nextlink_e_lat = nextLinks.loc[nextlink_idx][
-                                "E_Lat_left"
-                            ]
-                            nextlink_e_long = nextLinks.loc[nextlink_idx][
-                                "E_Long_left"
-                            ]
+                            nextlink_b_lat = nextLinks.loc[nextlink_idx]["B_Lat_left"]
+                            nextlink_b_long = nextLinks.loc[nextlink_idx]["B_Long_left"]
+                            nextlink_e_lat = nextLinks.loc[nextlink_idx]["E_Lat_left"]
+                            nextlink_e_long = nextLinks.loc[nextlink_idx]["E_Long_left"]
                             nextlink_len = (
                                 nextLinks.loc[nextlink_idx]["Miles"] * 5280
                             )  # miles to feet
@@ -956,9 +872,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                     float(nextlink_b_long),
                                     float(nextlink_b_lat),
                                 )
-                                nextlink_b_dis = cmp_seg_geo.project(
-                                    nextlink_b_point
-                                )
+                                nextlink_b_dis = cmp_seg_geo.project(nextlink_b_point)
                                 nextLinks.loc[nextlink_idx, "INRIX_B_Loc"] = (
                                     nextlink_b_dis * 3.2808
                                 )  # meters to feet
@@ -970,9 +884,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                     float(nextlink_e_long),
                                     float(nextlink_e_lat),
                                 )
-                                nextlink_e_dis = cmp_seg_geo.project(
-                                    nextlink_e_point
-                                )
+                                nextlink_e_dis = cmp_seg_geo.project(nextlink_e_point)
                                 nextLinks.loc[nextlink_idx, "INRIX_E_Loc"] = (
                                     nextlink_e_dis * 3.2808
                                 )  # meters to feet
@@ -993,9 +905,9 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                 projected_len_ratio = (
                                     abs(nextlink_b_e_dis) / nextlink_len
                                 )
-                                nextLinks.loc[
-                                    nextlink_idx, "Proj_Ratio"
-                                ] = projected_len_ratio
+                                nextLinks.loc[nextlink_idx, "Proj_Ratio"] = (
+                                    projected_len_ratio
+                                )
 
                                 nextlink_degree = (180 / math.pi) * math.atan2(
                                     nextlink_e_long - nextlink_b_long,
@@ -1004,48 +916,36 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                 # Ensure the degree is calculated following the original direction
                                 if nextlink_e_dis > nextlink_b_dis:
                                     cmp_degree = (180 / math.pi) * math.atan2(
-                                        nextlink_e_projected.x
-                                        - nextlink_b_projected.x,
-                                        nextlink_e_projected.y
-                                        - nextlink_b_projected.y,
+                                        nextlink_e_projected.x - nextlink_b_projected.x,
+                                        nextlink_e_projected.y - nextlink_b_projected.y,
                                     )
                                 else:
                                     cmp_degree = (180 / math.pi) * math.atan2(
-                                        nextlink_b_projected.x
-                                        - nextlink_e_projected.x,
-                                        nextlink_b_projected.y
-                                        - nextlink_e_projected.y,
+                                        nextlink_b_projected.x - nextlink_e_projected.x,
+                                        nextlink_b_projected.y - nextlink_e_projected.y,
                                     )
 
-                                nextlink_cmp_angle = abs(
-                                    cmp_degree - nextlink_degree
-                                )
+                                nextlink_cmp_angle = abs(cmp_degree - nextlink_degree)
                                 if nextlink_cmp_angle > 270:
-                                    nextlink_cmp_angle = (
-                                        360 - nextlink_cmp_angle
-                                    )
-                                nextLinks.loc[
-                                    nextlink_idx, "Proj_Angle"
-                                ] = nextlink_cmp_angle
+                                    nextlink_cmp_angle = 360 - nextlink_cmp_angle
+                                nextLinks.loc[nextlink_idx, "Proj_Angle"] = (
+                                    nextlink_cmp_angle
+                                )
 
                                 if (projected_len_ratio > len_ratio_thrhd) & (
                                     nextlink_cmp_angle < angle_thrhd
                                 ):
                                     found = 1
                                     cur_cnt = len(inrix_lines_matched_final)
-                                    inrix_lines_matched_final.loc[
-                                        cur_cnt, "SegID"
-                                    ] = nextLinks.loc[nextlink_idx]["SegID"]
+                                    inrix_lines_matched_final.loc[cur_cnt, "SegID"] = (
+                                        nextLinks.loc[nextlink_idx]["SegID"]
+                                    )
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "PreviousSe"
-                                    ] = nextLinks.loc[nextlink_idx][
-                                        "PreviousSe"
-                                    ]
+                                    ] = nextLinks.loc[nextlink_idx]["PreviousSe"]
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "NextSegID"
-                                    ] = nextLinks.loc[nextlink_idx][
-                                        "NextSegID"
-                                    ]
+                                    ] = nextLinks.loc[nextlink_idx]["NextSegID"]
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "Length_Matched"
                                     ] = nextlink_b_e_dis
@@ -1054,19 +954,13 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                     ] = cmp_seg_id
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "INRIX_B_Loc"
-                                    ] = (
-                                        nextlink_b_dis * 3.2808
-                                    )  # meters to feet
+                                    ] = nextlink_b_dis * 3.2808  # meters to feet
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "INRIX_E_Loc"
-                                    ] = (
-                                        nextlink_e_dis * 3.2808
-                                    )  # meters to feet
+                                    ] = nextlink_e_dis * 3.2808  # meters to feet
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "INX_B_CMP_B"
-                                    ] = (
-                                        nextlink_b_dis * 3.2808
-                                    )  # meters to feet
+                                    ] = nextlink_b_dis * 3.2808  # meters to feet
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "INX_E_CMP_E"
                                     ] = (
@@ -1075,19 +969,12 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                     inrix_matched_e_dis = (
                                         cmp_seg_len - nextlink_e_dis * 3.2808
                                     )
-                                    if (
-                                        inrix_matched_e_dis / cmp_seg_len
-                                        < gap_thrhd
-                                    ):
+                                    if inrix_matched_e_dis / cmp_seg_len < gap_thrhd:
                                         matched = 1
-                                    nextNode = nextLinks.loc[nextlink_idx][
-                                        "E_NodeID"
-                                    ]
+                                    nextNode = nextLinks.loc[nextlink_idx]["E_NodeID"]
                                     break
                                 else:
-                                    nextLinks.loc[
-                                        nextlink_idx, "Matching"
-                                    ] = "No"
+                                    nextLinks.loc[nextlink_idx, "Matching"] = "No"
 
                             else:  # nextlink is intersecting with buffer zone
                                 # nextlink Begin Node is within buffer zone while End Node is outside buffer zone
@@ -1095,9 +982,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                     float(nextlink_b_long),
                                     float(nextlink_b_lat),
                                 )
-                                nextlink_b_dis = cmp_seg_geo.project(
-                                    nextlink_b_point
-                                )
+                                nextlink_b_dis = cmp_seg_geo.project(nextlink_b_point)
                                 nextlink_b_cmp_e_dis = (
                                     cmp_seg_len - nextlink_b_dis * 3.2808
                                 )  # distance from nextlink begin point to cmp end point
@@ -1108,9 +993,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                     nextlink_b_dis
                                 )  # projected nextlink begin point on cmp segment
 
-                                cmp_e_point = Point(
-                                    float(cmp_e_long), float(cmp_e_lat)
-                                )
+                                cmp_e_point = Point(float(cmp_e_long), float(cmp_e_lat))
                                 cmp_e_nextlink_b_dis = nextlink_geo.project(
                                     cmp_e_point
                                 )  # distance from inrix nextlink begin point to cmp end point
@@ -1125,9 +1008,9 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                     nextlink_b_cmp_e_dis
                                     / (cmp_e_nextlink_b_dis * 3.2808),
                                 )
-                                nextLinks.loc[
-                                    nextlink_idx, "Proj_Ratio"
-                                ] = projected_len_ratio
+                                nextLinks.loc[nextlink_idx, "Proj_Ratio"] = (
+                                    projected_len_ratio
+                                )
 
                                 nextlink_degree = (180 / math.pi) * math.atan2(
                                     cmp_e_projected.x - nextlink_b_long,
@@ -1137,16 +1020,12 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                     cmp_e_long - nextlink_b_projected.x,
                                     cmp_e_lat - nextlink_b_projected.y,
                                 )
-                                nextlink_cmp_angle = abs(
-                                    cmp_degree - nextlink_degree
-                                )
+                                nextlink_cmp_angle = abs(cmp_degree - nextlink_degree)
                                 if nextlink_cmp_angle > 270:
-                                    nextlink_cmp_angle = (
-                                        360 - nextlink_cmp_angle
-                                    )
-                                nextLinks.loc[
-                                    nextlink_idx, "Proj_Angle"
-                                ] = nextlink_cmp_angle
+                                    nextlink_cmp_angle = 360 - nextlink_cmp_angle
+                                nextLinks.loc[nextlink_idx, "Proj_Angle"] = (
+                                    nextlink_cmp_angle
+                                )
 
                                 if (projected_len_ratio > len_ratio_thrhd) & (
                                     nextlink_cmp_angle < angle_thrhd
@@ -1154,19 +1033,15 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                     found = 1
                                     matched = 1
                                     cur_cnt = len(inrix_lines_matched_final)
-                                    inrix_lines_matched_final.loc[
-                                        cur_cnt, "SegID"
-                                    ] = nextLinks.loc[nextlink_idx]["SegID"]
+                                    inrix_lines_matched_final.loc[cur_cnt, "SegID"] = (
+                                        nextLinks.loc[nextlink_idx]["SegID"]
+                                    )
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "PreviousSe"
-                                    ] = nextLinks.loc[nextlink_idx][
-                                        "PreviousSe"
-                                    ]
+                                    ] = nextLinks.loc[nextlink_idx]["PreviousSe"]
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "NextSegID"
-                                    ] = nextLinks.loc[nextlink_idx][
-                                        "NextSegID"
-                                    ]
+                                    ] = nextLinks.loc[nextlink_idx]["NextSegID"]
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "Length_Matched"
                                     ] = nextlink_b_cmp_e_dis
@@ -1175,32 +1050,30 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                     ] = cmp_seg_id
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "INRIX_B_Loc"
-                                    ] = (nextlink_b_dis * 3.2808)
+                                    ] = nextlink_b_dis * 3.2808
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "INRIX_E_Loc"
                                     ] = cmp_seg_len
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "INX_B_CMP_B"
-                                    ] = (nextlink_b_dis * 3.2808)
+                                    ] = nextlink_b_dis * 3.2808
                                     inrix_lines_matched_final.loc[
                                         cur_cnt, "INX_E_CMP_E"
                                     ] = 0
                                     inrix_matched_e_dis = 0
                                     break
                                 else:
-                                    nextLinks.loc[
-                                        nextlink_idx, "Matching"
-                                    ] = "No"
+                                    nextLinks.loc[nextlink_idx, "Matching"] = "No"
                         if matched == 1:
-                            cmp_segs_prj.loc[
-                                cmp_seg_idx, "CMP_E_Indt"
-                            ] = "Yes-LinkAdded"
+                            cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = (
+                                "Yes-LinkAdded"
+                            )
                         if (
                             found == 0
                         ):  # break while loop if no mathcing link found in nextlinks
-                            cmp_segs_prj.loc[
-                                cmp_seg_idx, "CMP_E_Indt"
-                            ] = "No Matching Next Link"
+                            cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = (
+                                "No Matching Next Link"
+                            )
                             break
 
 
@@ -1239,9 +1112,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
         ]
 
         if intersect_b.empty:
-            cmp_segs_prj.loc[
-                cmp_seg_idx, "CMP_B_Indt"
-            ] = "No Intersecting Lines Found"
+            cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = "No Intersecting Lines Found"
         else:
             found_b = 0
             found_match = 0
@@ -1252,9 +1123,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                 link_b_long = intersect_b.loc[link_idx]["B_Long"]
                 link_e_lat = intersect_b.loc[link_idx]["E_Lat"]
                 link_e_long = intersect_b.loc[link_idx]["E_Long"]
-                link_len = (
-                    intersect_b.loc[link_idx]["Miles"] * 5280
-                )  # miles to feet
+                link_len = intersect_b.loc[link_idx]["Miles"] * 5280  # miles to feet
 
                 # link End Node is within buffer zone while Begin Node is outside buffer zone
                 link_e_point = Point(float(link_e_long), float(link_e_lat))
@@ -1297,35 +1166,25 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                     if link_cmp_angle < angle_thrhd:
                         found_match = 1
                         cur_cnt = len(inrix_lines_matched_final)
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "SegID"
-                        ] = intersect_b.loc[link_idx]["SegID"]
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "PreviousSe"
-                        ] = intersect_b.loc[link_idx]["PreviousSe"]
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "NextSegID"
-                        ] = intersect_b.loc[link_idx]["NextSegID"]
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "Length_Matched"
-                        ] = (link_e_cmp_b_dis * 3.2808)
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "cmp_segid"
-                        ] = cmp_seg_id
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "INRIX_B_Loc"
-                        ] = 0
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "INRIX_E_Loc"
-                        ] = (
+                        inrix_lines_matched_final.loc[cur_cnt, "SegID"] = (
+                            intersect_b.loc[link_idx]["SegID"]
+                        )
+                        inrix_lines_matched_final.loc[cur_cnt, "PreviousSe"] = (
+                            intersect_b.loc[link_idx]["PreviousSe"]
+                        )
+                        inrix_lines_matched_final.loc[cur_cnt, "NextSegID"] = (
+                            intersect_b.loc[link_idx]["NextSegID"]
+                        )
+                        inrix_lines_matched_final.loc[cur_cnt, "Length_Matched"] = (
+                            link_e_cmp_b_dis * 3.2808
+                        )
+                        inrix_lines_matched_final.loc[cur_cnt, "cmp_segid"] = cmp_seg_id
+                        inrix_lines_matched_final.loc[cur_cnt, "INRIX_B_Loc"] = 0
+                        inrix_lines_matched_final.loc[cur_cnt, "INRIX_E_Loc"] = (
                             link_e_cmp_b_dis * 3.2808
                         )  # meters to feet
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "INX_B_CMP_B"
-                        ] = 0
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "INX_E_CMP_E"
-                        ] = (
+                        inrix_lines_matched_final.loc[cur_cnt, "INX_B_CMP_B"] = 0
+                        inrix_lines_matched_final.loc[cur_cnt, "INX_E_CMP_E"] = (
                             cmp_seg_len - link_e_cmp_b_dis * 3.2808
                         )  # meters to feet
                         break  # link_idx for loop
@@ -1335,9 +1194,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                     cmp_b_dis = link_geo.project(
                         cmp_b_point
                     )  # distance from inrix link to cmp begin point
-                    cmp_b_link_e_dis = (
-                        link_len - cmp_b_dis * 3.2808
-                    )  # meters to feet
+                    cmp_b_link_e_dis = link_len - cmp_b_dis * 3.2808  # meters to feet
                     cmp_b_projected = link_geo.interpolate(
                         cmp_b_dis
                     )  # projected cmp begin point on intersecting inrix link
@@ -1362,54 +1219,42 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                     ):
                         found_b = 1
                         cur_cnt = len(inrix_lines_matched_final)
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "SegID"
-                        ] = intersect_b.loc[link_idx]["SegID"]
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "PreviousSe"
-                        ] = intersect_b.loc[link_idx]["PreviousSe"]
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "NextSegID"
-                        ] = intersect_b.loc[link_idx]["NextSegID"]
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "Length_Matched"
-                        ] = (link_e_cmp_b_dis * 3.2808)
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "cmp_segid"
-                        ] = cmp_seg_id
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "INRIX_B_Loc"
-                        ] = 0
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "INRIX_E_Loc"
-                        ] = (
+                        inrix_lines_matched_final.loc[cur_cnt, "SegID"] = (
+                            intersect_b.loc[link_idx]["SegID"]
+                        )
+                        inrix_lines_matched_final.loc[cur_cnt, "PreviousSe"] = (
+                            intersect_b.loc[link_idx]["PreviousSe"]
+                        )
+                        inrix_lines_matched_final.loc[cur_cnt, "NextSegID"] = (
+                            intersect_b.loc[link_idx]["NextSegID"]
+                        )
+                        inrix_lines_matched_final.loc[cur_cnt, "Length_Matched"] = (
+                            link_e_cmp_b_dis * 3.2808
+                        )
+                        inrix_lines_matched_final.loc[cur_cnt, "cmp_segid"] = cmp_seg_id
+                        inrix_lines_matched_final.loc[cur_cnt, "INRIX_B_Loc"] = 0
+                        inrix_lines_matched_final.loc[cur_cnt, "INRIX_E_Loc"] = (
                             link_e_cmp_b_dis * 3.2808
                         )  # meters to feet
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "INX_B_CMP_B"
-                        ] = 0
-                        inrix_lines_matched_final.loc[
-                            cur_cnt, "INX_E_CMP_E"
-                        ] = (
+                        inrix_lines_matched_final.loc[cur_cnt, "INX_B_CMP_B"] = 0
+                        inrix_lines_matched_final.loc[cur_cnt, "INX_E_CMP_E"] = (
                             cmp_seg_len - link_e_cmp_b_dis * 3.2808
                         )  # meters to feet
-                        inrix_matched_e_dis = (
-                            cmp_seg_len - link_e_cmp_b_dis * 3.2808
-                        )
+                        inrix_matched_e_dis = cmp_seg_len - link_e_cmp_b_dis * 3.2808
                         nextNode = intersect_b.loc[link_idx]["E_NodeID"]
                         inrix_frc = intersect_b.loc[link_idx]["FRC"]
                         break  # link_idx for loop
 
             if found_match == 1:
-                cmp_segs_prj.loc[
-                    cmp_seg_idx, "CMP_B_Indt"
-                ] = "Found Matching Link for Whole CMP Segment"
+                cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = (
+                    "Found Matching Link for Whole CMP Segment"
+                )
                 continue
 
             if found_b == 0:
-                cmp_segs_prj.loc[
-                    cmp_seg_idx, "CMP_B_Indt"
-                ] = "No Matching Intersecting Link"
+                cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = (
+                    "No Matching Intersecting Link"
+                )
                 continue
 
             found_next = 0
@@ -1432,26 +1277,16 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                     & (inrix_lines_intersect["B_NodeID"] == nextNode)
                 ]
                 if len(nextLinks) == 0:
-                    cmp_segs_prj.loc[
-                        cmp_seg_idx, "CMP_E_Indt"
-                    ] = "Next links not found"
+                    cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = "Next links not found"
                     break
                 else:
                     nextLinks_idx = nextLinks.index.tolist()
                     for nextlink_idx in nextLinks_idx:
                         nextlink_geo = nextLinks.loc[nextlink_idx]["geometry"]
-                        nextlink_b_lat = nextLinks.loc[nextlink_idx][
-                            "B_Lat_left"
-                        ]
-                        nextlink_b_long = nextLinks.loc[nextlink_idx][
-                            "B_Long_left"
-                        ]
-                        nextlink_e_lat = nextLinks.loc[nextlink_idx][
-                            "E_Lat_left"
-                        ]
-                        nextlink_e_long = nextLinks.loc[nextlink_idx][
-                            "E_Long_left"
-                        ]
+                        nextlink_b_lat = nextLinks.loc[nextlink_idx]["B_Lat_left"]
+                        nextlink_b_long = nextLinks.loc[nextlink_idx]["B_Long_left"]
+                        nextlink_e_lat = nextLinks.loc[nextlink_idx]["E_Lat_left"]
+                        nextlink_e_long = nextLinks.loc[nextlink_idx]["E_Long_left"]
                         nextlink_len = (
                             nextLinks.loc[nextlink_idx]["Miles"] * 5280
                         )  # miles to feet
@@ -1462,9 +1297,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             nextlink_b_point = Point(
                                 float(nextlink_b_long), float(nextlink_b_lat)
                             )
-                            nextlink_b_dis = cmp_seg_geo.project(
-                                nextlink_b_point
-                            )
+                            nextlink_b_dis = cmp_seg_geo.project(nextlink_b_point)
                             nextLinks.loc[nextlink_idx, "INRIX_B_Loc"] = (
                                 nextlink_b_dis * 3.2808
                             )  # meters to feet
@@ -1475,9 +1308,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             nextlink_e_point = Point(
                                 float(nextlink_e_long), float(nextlink_e_lat)
                             )
-                            nextlink_e_dis = cmp_seg_geo.project(
-                                nextlink_e_point
-                            )
+                            nextlink_e_dis = cmp_seg_geo.project(nextlink_e_point)
                             nextLinks.loc[nextlink_idx, "INRIX_E_Loc"] = (
                                 nextlink_e_dis * 3.2808
                             )  # meters to feet
@@ -1495,12 +1326,10 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             nextlink_b_e_dis = (
                                 nextlink_e_dis - nextlink_b_dis
                             ) * 3.2808  # meters to feet
-                            projected_len_ratio = (
-                                abs(nextlink_b_e_dis) / nextlink_len
+                            projected_len_ratio = abs(nextlink_b_e_dis) / nextlink_len
+                            nextLinks.loc[nextlink_idx, "Proj_Ratio"] = (
+                                projected_len_ratio
                             )
-                            nextLinks.loc[
-                                nextlink_idx, "Proj_Ratio"
-                            ] = projected_len_ratio
 
                             nextlink_degree = (180 / math.pi) * math.atan2(
                                 nextlink_e_long - nextlink_b_long,
@@ -1509,27 +1338,21 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             # Ensure the degree is calculated following the original direction
                             if nextlink_e_dis > nextlink_b_dis:
                                 cmp_degree = (180 / math.pi) * math.atan2(
-                                    nextlink_e_projected.x
-                                    - nextlink_b_projected.x,
-                                    nextlink_e_projected.y
-                                    - nextlink_b_projected.y,
+                                    nextlink_e_projected.x - nextlink_b_projected.x,
+                                    nextlink_e_projected.y - nextlink_b_projected.y,
                                 )
                             else:
                                 cmp_degree = (180 / math.pi) * math.atan2(
-                                    nextlink_b_projected.x
-                                    - nextlink_e_projected.x,
-                                    nextlink_b_projected.y
-                                    - nextlink_e_projected.y,
+                                    nextlink_b_projected.x - nextlink_e_projected.x,
+                                    nextlink_b_projected.y - nextlink_e_projected.y,
                                 )
 
-                            nextlink_cmp_angle = abs(
-                                cmp_degree - nextlink_degree
-                            )
+                            nextlink_cmp_angle = abs(cmp_degree - nextlink_degree)
                             if nextlink_cmp_angle > 270:
                                 nextlink_cmp_angle = 360 - nextlink_cmp_angle
-                            nextLinks.loc[
-                                nextlink_idx, "Proj_Angle"
-                            ] = nextlink_cmp_angle
+                            nextLinks.loc[nextlink_idx, "Proj_Angle"] = (
+                                nextlink_cmp_angle
+                            )
 
                             nextlink_frc = nextLinks.loc[nextlink_idx]["FRC"]
 
@@ -1540,36 +1363,30 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             ):
                                 found_next = 1
                                 cur_cnt = len(inrix_lines_matched_final)
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "SegID"
-                                ] = nextLinks.loc[nextlink_idx]["SegID"]
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "PreviousSe"
-                                ] = nextLinks.loc[nextlink_idx]["PreviousSe"]
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "NextSegID"
-                                ] = nextLinks.loc[nextlink_idx]["NextSegID"]
+                                inrix_lines_matched_final.loc[cur_cnt, "SegID"] = (
+                                    nextLinks.loc[nextlink_idx]["SegID"]
+                                )
+                                inrix_lines_matched_final.loc[cur_cnt, "PreviousSe"] = (
+                                    nextLinks.loc[nextlink_idx]["PreviousSe"]
+                                )
+                                inrix_lines_matched_final.loc[cur_cnt, "NextSegID"] = (
+                                    nextLinks.loc[nextlink_idx]["NextSegID"]
+                                )
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "Length_Matched"
                                 ] = nextlink_b_e_dis
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "cmp_segid"
-                                ] = cmp_seg_id
+                                inrix_lines_matched_final.loc[cur_cnt, "cmp_segid"] = (
+                                    cmp_seg_id
+                                )
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INRIX_B_Loc"
-                                ] = (
-                                    nextlink_b_dis * 3.2808
-                                )  # meters to feet
+                                ] = nextlink_b_dis * 3.2808  # meters to feet
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INRIX_E_Loc"
-                                ] = (
-                                    nextlink_e_dis * 3.2808
-                                )  # meters to feet
+                                ] = nextlink_e_dis * 3.2808  # meters to feet
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INX_B_CMP_B"
-                                ] = (
-                                    nextlink_b_dis * 3.2808
-                                )  # meters to feet
+                                ] = nextlink_b_dis * 3.2808  # meters to feet
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INX_E_CMP_E"
                                 ] = (
@@ -1578,14 +1395,9 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                 inrix_matched_e_dis = (
                                     cmp_seg_len - nextlink_e_dis * 3.2808
                                 )
-                                if (
-                                    inrix_matched_e_dis / cmp_seg_len
-                                    < gap_thrhd
-                                ):
+                                if inrix_matched_e_dis / cmp_seg_len < gap_thrhd:
                                     found_next_match = 1
-                                nextNode = nextLinks.loc[nextlink_idx][
-                                    "E_NodeID"
-                                ]
+                                nextNode = nextLinks.loc[nextlink_idx]["E_NodeID"]
                                 break  # for loop
                             else:
                                 nextLinks.loc[nextlink_idx, "Matching"] = "No"
@@ -1595,9 +1407,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             nextlink_b_point = Point(
                                 float(nextlink_b_long), float(nextlink_b_lat)
                             )
-                            nextlink_b_dis = cmp_seg_geo.project(
-                                nextlink_b_point
-                            )
+                            nextlink_b_dis = cmp_seg_geo.project(nextlink_b_point)
                             nextlink_b_cmp_e_dis = (
                                 cmp_seg_len - nextlink_b_dis * 3.2808
                             )  # distance from nextlink begin point to cmp end point
@@ -1608,9 +1418,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                 nextlink_b_dis
                             )  # projected nextlink begin point on cmp segment
 
-                            cmp_e_point = Point(
-                                float(cmp_e_long), float(cmp_e_lat)
-                            )
+                            cmp_e_point = Point(float(cmp_e_long), float(cmp_e_lat))
                             cmp_e_nextlink_b_dis = nextlink_geo.project(
                                 cmp_e_point
                             )  # distance from inrix nextlink begin point to cmp end point
@@ -1619,15 +1427,12 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             )  # projected cmp end point on intersecting inrix link
 
                             projected_len_ratio = min(
-                                cmp_e_nextlink_b_dis
-                                * 3.2808
-                                / nextlink_b_cmp_e_dis,
-                                nextlink_b_cmp_e_dis
-                                / (cmp_e_nextlink_b_dis * 3.2808),
+                                cmp_e_nextlink_b_dis * 3.2808 / nextlink_b_cmp_e_dis,
+                                nextlink_b_cmp_e_dis / (cmp_e_nextlink_b_dis * 3.2808),
                             )
-                            nextLinks.loc[
-                                nextlink_idx, "Proj_Ratio"
-                            ] = projected_len_ratio
+                            nextLinks.loc[nextlink_idx, "Proj_Ratio"] = (
+                                projected_len_ratio
+                            )
 
                             nextlink_degree = (180 / math.pi) * math.atan2(
                                 cmp_e_projected.x - nextlink_b_long,
@@ -1637,14 +1442,12 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                 cmp_e_long - nextlink_b_projected.x,
                                 cmp_e_lat - nextlink_b_projected.y,
                             )
-                            nextlink_cmp_angle = abs(
-                                cmp_degree - nextlink_degree
-                            )
+                            nextlink_cmp_angle = abs(cmp_degree - nextlink_degree)
                             if nextlink_cmp_angle > 270:
                                 nextlink_cmp_angle = 360 - nextlink_cmp_angle
-                            nextLinks.loc[
-                                nextlink_idx, "Proj_Angle"
-                            ] = nextlink_cmp_angle
+                            nextLinks.loc[nextlink_idx, "Proj_Angle"] = (
+                                nextlink_cmp_angle
+                            )
 
                             nextlink_frc = nextLinks.loc[nextlink_idx]["FRC"]
 
@@ -1656,63 +1459,54 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                 found_next = 1
                                 found_next_match = 1
                                 cur_cnt = len(inrix_lines_matched_final)
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "SegID"
-                                ] = nextLinks.loc[nextlink_idx]["SegID"]
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "PreviousSe"
-                                ] = nextLinks.loc[nextlink_idx]["PreviousSe"]
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "NextSegID"
-                                ] = nextLinks.loc[nextlink_idx]["NextSegID"]
+                                inrix_lines_matched_final.loc[cur_cnt, "SegID"] = (
+                                    nextLinks.loc[nextlink_idx]["SegID"]
+                                )
+                                inrix_lines_matched_final.loc[cur_cnt, "PreviousSe"] = (
+                                    nextLinks.loc[nextlink_idx]["PreviousSe"]
+                                )
+                                inrix_lines_matched_final.loc[cur_cnt, "NextSegID"] = (
+                                    nextLinks.loc[nextlink_idx]["NextSegID"]
+                                )
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "Length_Matched"
                                 ] = nextlink_b_cmp_e_dis
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "cmp_segid"
-                                ] = cmp_seg_id
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "INRIX_B_Loc"
-                                ] = (nextlink_b_dis * 3.2808)
-                                inrix_lines_matched_final.loc[
-                                    cur_cnt, "INRIX_E_Loc"
-                                ] = (
-                                    cmp_seg_geo.project(cmp_e_projected)
-                                    * 3.2808
+                                inrix_lines_matched_final.loc[cur_cnt, "cmp_segid"] = (
+                                    cmp_seg_id
                                 )
                                 inrix_lines_matched_final.loc[
+                                    cur_cnt, "INRIX_B_Loc"
+                                ] = nextlink_b_dis * 3.2808
+                                inrix_lines_matched_final.loc[
+                                    cur_cnt, "INRIX_E_Loc"
+                                ] = cmp_seg_geo.project(cmp_e_projected) * 3.2808
+                                inrix_lines_matched_final.loc[
                                     cur_cnt, "INX_B_CMP_B"
-                                ] = (nextlink_b_dis * 3.2808)
+                                ] = nextlink_b_dis * 3.2808
                                 inrix_lines_matched_final.loc[
                                     cur_cnt, "INX_E_CMP_E"
                                 ] = max(
                                     0,
                                     cmp_seg_len
-                                    - cmp_seg_geo.project(cmp_e_projected)
-                                    * 3.2808,
+                                    - cmp_seg_geo.project(cmp_e_projected) * 3.2808,
                                 )
                                 inrix_matched_e_dis = max(
                                     0,
                                     cmp_seg_len
-                                    - cmp_seg_geo.project(cmp_e_projected)
-                                    * 3.2808,
+                                    - cmp_seg_geo.project(cmp_e_projected) * 3.2808,
                                 )
-                                nextNode = nextLinks.loc[nextlink_idx][
-                                    "E_NodeID"
-                                ]
+                                nextNode = nextLinks.loc[nextlink_idx]["E_NodeID"]
                                 break  # for loop
                             else:
                                 nextLinks.loc[nextlink_idx, "Matching"] = "No"
                     if found_next_match == 1:
-                        cmp_segs_prj.loc[
-                            cmp_seg_idx, "CMP_E_Indt"
-                        ] = "Yes-LinkAdded"
+                        cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = "Yes-LinkAdded"
                     if (
                         found_next == 0
                     ):  # break while loop if no mathcing link found in nextlinks
-                        cmp_segs_prj.loc[
-                            cmp_seg_idx, "CMP_E_Indt"
-                        ] = "No Matching Next Link"
+                        cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = (
+                            "No Matching Next Link"
+                        )
                         break
 
 
@@ -1721,18 +1515,12 @@ del cmp_segs_prj["Len_Ratio"]
 
 # Calculate the total length of matched INRIX links
 inrix_matched_length = (
-    inrix_lines_matched_final.groupby("cmp_segid")
-    .Length_Matched.sum()
-    .reset_index()
+    inrix_lines_matched_final.groupby("cmp_segid").Length_Matched.sum().reset_index()
 )
 inrix_matched_length.columns = ["cmp_segid", "Len_Matched"]
-inrix_matched_length["cmp_segid"] = inrix_matched_length["cmp_segid"].astype(
-    int
-)
+inrix_matched_length["cmp_segid"] = inrix_matched_length["cmp_segid"].astype(int)
 
-cmp_segs_prj = cmp_segs_prj.merge(
-    inrix_matched_length, on="cmp_segid", how="left"
-)
+cmp_segs_prj = cmp_segs_prj.merge(inrix_matched_length, on="cmp_segid", how="left")
 cmp_segs_prj["Len_Ratio"] = np.where(
     pd.isnull(cmp_segs_prj["Len_Matched"]),
     0,
@@ -1743,18 +1531,14 @@ cmp_segs_prj["Len_Ratio"] = cmp_segs_prj["Len_Ratio"].round(1)
 inrix_lines_matched_output = inrix_lines_matched_final[
     ["cmp_segid", "SegID", "Length_Matched"]
 ]
-inrix_lines_matched_output.columns = [
-    "CMP_SegID",
-    "INRIX_SegID",
-    "Length_Matched",
-]
+inrix_lines_matched_output.columns = ["CMP_SegID", "INRIX_SegID", "Length_Matched"]
 
 # Output files
 cmp_segs_prj.to_file(cmp + "_matchedlength_check.shp")
 
-inrix_lines_matched_output[
+inrix_lines_matched_output[["CMP_SegID", "INRIX_SegID"]] = inrix_lines_matched_output[
     ["CMP_SegID", "INRIX_SegID"]
-] = inrix_lines_matched_output[["CMP_SegID", "INRIX_SegID"]].astype(int)
+].astype(int)
 inrix_lines_matched_output.to_csv(
     "CMP_Segment_INRIX_Links_Correspondence_%s.csv" % MAP_VER, index=False
 )
@@ -1766,9 +1550,7 @@ if MANUAL_UPDATE:
         r"Q:\CMP\LOS Monitoring 2022\Network_Conflation\v2202\conflation_script_test\manual_remove.csv"
     )
     rem_df["del_flag"] = 1
-    inrix_lines_matched_output = inrix_lines_matched_output.merge(
-        rem_df, how="left"
-    )
+    inrix_lines_matched_output = inrix_lines_matched_output.merge(rem_df, how="left")
     inrix_lines_matched_output = inrix_lines_matched_output.loc[
         pd.isna(inrix_lines_matched_output["del_flag"]),
     ]
@@ -1776,9 +1558,7 @@ if MANUAL_UPDATE:
     add_df = pd.read_csv(
         r"Q:\CMP\LOS Monitoring 2022\Network_Conflation\v2202\conflation_script_test\manual_add.csv"
     )
-    inrix_lines_matched_output = pd.concat(
-        (inrix_lines_matched_output[cols], add_df)
-    )
+    inrix_lines_matched_output = pd.concat((inrix_lines_matched_output[cols], add_df))
     inrix_lines_matched_output.to_csv(
         "CMP_Segment_INRIX_Links_Correspondence_%s_Manual.csv" % MAP_VER,
         index=False,
