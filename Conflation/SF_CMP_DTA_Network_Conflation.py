@@ -1,4 +1,14 @@
 """
+DTA = the dynamic traffic assignment model
+
+This script is developed to automatically establish the corresponding relationship between CMP segments and the DTA network links.
+It finds DTA links that are near each CMP segment and decides the matching links based on street name, angle and distance attributes.
+
+File was last touched 2022/12/9
+The docstring (only above here) was amended then committed to repo 2023/4/6
+
+The rest of this docstring has not been updated to reflect any changes between the swap from doing conflation on the INRIX network vs the DTA network:
+
 This script is developed to automatically establish the corresponding relationship between CMP segments and INRIX XD network links.
 It finds INRIX links that are near each CMP segment and decides the matching links based on street name, angle and distance attributes.
 
@@ -21,21 +31,18 @@ To use the script, place the script under the same folder with input files and r
 python SF_CMP_INRIX_Network_Conflation.py
 """
 
-MAP_VER = 2301
+MAP_VER = 2202
 
 # Specify input file names
 # INRIX XD network
-inrix_sf = f"INRIX_XD-SF-{MAP_VER}"  # .gpkg'  # HOTFIX, leaving the extension hardcoded below
-segid_col = "XDSegID"
+# dta = 'inrix_xd_sf'
+dta = "links"
+segid_col = "ID"
 # CMP network
-# CMP network (as in the reports)
-# cmp = "Q:\GIS\Transportation\Roads\CMP\cmp_roadway_segments"  # .shp"  # HOTFIX, leaving the extension hardcoded below
-# online COVID congestion tracker network:
-cmp = "Q:\CMP\LOS Monitoring 2022\CMP_exp_shp\cmp_segments_exp_v2201"  # .shp"  # HOTFIX, leaving the extension hardcoded below
+cmp = "cmp_segments_exp_v2201"
 
 
 import math
-import os
 import warnings
 
 # Import needed python modules
@@ -56,12 +63,8 @@ wgs84 = {
     "no_defs": True,
 }
 # Define NAD 1983 StatePlane California III
-cal3 = {
-    "proj": "lcc +lat_1=37.06666666666667 +lat_2=38.43333333333333 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000.0000000002",
-    "ellps": "GRS80",
-    "datum": "NAD83",
-    "no_defs": True,
-}
+# cal3 = {'proj': 'lcc +lat_1=37.06666666666667 +lat_2=38.43333333333333 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000.0000000002', 'ellps': 'GRS80', 'datum': 'NAD83', 'no_defs': True}
+cal = "epsg:2227"
 
 # Convert original coordinate system to California III state plane
 # CMP network
@@ -69,22 +72,18 @@ cmp_segs_org = gp.read_file(cmp + ".shp")
 cmp_segs_prj = cmp_segs_org.to_crs(cal3)
 cmp_segs_prj["cmp_name"] = cmp_segs_prj["cmp_name"].str.replace("/ ", "/")
 cmp_segs_prj["Length"] = cmp_segs_prj.geometry.length
-cmp_segs_prj["Length"] = cmp_segs_prj["Length"] * 3.2808  # meters to feet
-cmp_segs_prj.to_file(os.path.splitext(cmp)[0] + "_prj.shp")
+# cmp_segs_prj['Length'] = cmp_segs_prj['Length'] * 3.2808  #meters to feet (REMOVING, EPSG:2227 is in feet
+cmp_segs_prj.to_file(cmp + "_prj.shp")
 
 # INRIX XD network
-inrix_net_org = gp.read_file(
-    inrix_sf + ".gpkg"
-)  # HOTFIX, leaving this hardcoded for now, switched from .shp to .gpkg
-inrix_net_prj = inrix_net_org.to_crs(cal3)
-inrix_net_prj["Length"] = inrix_net_prj.geometry.length
-inrix_net_prj["Length"] = inrix_net_prj["Length"] * 3.2808  # meters to feet
-inrix_net_prj["SegID"] = inrix_net_prj[segid_col].astype(int)
-inrix_net_prj["Miles"] = inrix_net_prj["Miles"].astype(float)
-inrix_net_prj = inrix_net_prj.rename(
-    columns={"PreviousXD": "PreviousSe", "NextXDSegI": "NextSegID"}
-)
-inrix_net_prj.to_file(os.path.splitext(inrix_sf)[0] + "_prj.shp")
+dta_net_org = gp.read_file(dta + ".shp")
+dta_net_prj = dta_net_org.to_crs(cal3)
+dta_net_prj["Length"] = dta_net_prj.geometry.length
+# dta_net_prj['Length'] = dta_net_prj['Length'] * 3.2808  #meters to feet #meters to feet (REMOVING, EPSG:2227 is in feet
+dta_net_prj["SegID"] = dta_net_prj[segid_col].astype(int)
+dta_net_prj["Miles"] = dta_net_prj["Miles"].astype(float)
+# dta_net_prj = dta_net_prj.rename(columns = {'PreviousXD':'PreviousSe', 'NextXDSegI':'NextSegID'})
+dta_net_prj.to_file(dta + "_prj.shp")
 
 
 # # Get endpoints of INRIX links
@@ -100,13 +99,13 @@ vschema = {
     },
 }
 # Input file
-inrixin = inrix_sf + "_prj.shp"
+dtain = dta + "_prj.shp"
 # Output file
-inrixout = inrix_sf + "_prj_endpoints.shp"
+dtaout = dta + "_prj_endpoints.shp"
 with fiona.open(
-    inrixout, mode="w", crs=cal3, driver="ESRI Shapefile", schema=vschema
+    dtaout, mode="w", crs=cal3, driver="ESRI Shapefile", schema=vschema
 ) as output:
-    layer = fiona.open(inrixin)
+    layer = fiona.open(dtain)
     for line in layer:
         vertices = line["geometry"]["coordinates"]
         v_begin = vertices[0]
@@ -114,8 +113,8 @@ with fiona.open(
             v_begin = vertices[0][0]
             point = Point(float(v_begin[0]), float(v_begin[1]))
             prop = {
-                "SegID": int(line["properties"]["SegID"]),
-                "RoadName": line["properties"]["RoadName"],
+                "ID": int(line["properties"]["ID"]),
+                "Start": line["properties"]["Start"],  # here
                 "type": "begin",
                 "Latitude": float(v_begin[1]),
                 "Longitude": float(v_begin[0]),
@@ -158,7 +157,7 @@ with fiona.open(
 
 
 # Read in the created inrix endpoints file
-endpoints = gp.read_file(inrix_sf + "_prj_endpoints.shp")
+endpoints = gp.read_file(dta + "_prj_endpoints.shp")
 
 # Assign unique node id
 endpoints_cnt = (
@@ -173,7 +172,7 @@ endpoints_cnt["Coordinates"] = list(
 )
 endpoints_cnt["Coordinates"] = endpoints_cnt["Coordinates"].apply(Point)
 endpoints_cnt_gpd = gp.GeoDataFrame(endpoints_cnt, geometry="Coordinates")
-endpoints_cnt_gpd.to_file(inrix_sf + "_prj_endpoints_unique.shp")
+endpoints_cnt_gpd.to_file(dta + "_prj_endpoints_unique.shp")
 
 endpoints = endpoints.merge(
     endpoints_cnt, on=["Latitude", "Longitude"], how="left"
@@ -190,8 +189,8 @@ endpoints_end = endpoints[endpoints["type"] == "end"][
 ]
 endpoints_end.columns = ["SegID", "E_Lat", "E_Long", "E_NodeID"]
 
-inrix_net_prj = inrix_net_prj.merge(endpoints_begin, on="SegID")
-inrix_net_prj = inrix_net_prj.merge(endpoints_end, on="SegID")
+dta_net_prj = dta_net_prj.merge(endpoints_begin, on="SegID")
+dta_net_prj = dta_net_prj.merge(endpoints_end, on="SegID")
 
 
 # # Get endnodes of CMP segments
@@ -312,12 +311,12 @@ cmp_segs_buffer.to_file(cmp + "_prj_buffer.shp")
 
 # INRIX lines intersecting cmp segment buffer zone
 inrix_lines_intersect = gp.sjoin(
-    inrix_net_prj, cmp_segs_buffer, op="intersects"
+    dta_net_prj, cmp_segs_buffer, op="intersects"
 ).reset_index()
 
 # INRIX lines within cmp segment buffer zone
 inrix_lines_within = gp.sjoin(
-    inrix_net_prj, cmp_segs_buffer, op="within"
+    dta_net_prj, cmp_segs_buffer, op="within"
 ).reset_index()
 
 
@@ -1214,7 +1213,7 @@ cmp_endpoints_buffer.to_file(cmp + "_prj_endpoints_buffer.shp")
 
 # INRIX lines intersecting with cmp endpoint buffer zone
 inrix_lines_intersect_ep = gp.sjoin(
-    inrix_net_prj, cmp_endpoints_buffer, op="intersects"
+    dta_net_prj, cmp_endpoints_buffer, op="intersects"
 ).reset_index()
 
 
@@ -1762,9 +1761,7 @@ inrix_lines_matched_output.to_csv(
 MANUAL_UPDATE = True
 if MANUAL_UPDATE:
     cols = inrix_lines_matched_output.columns
-    rem_df = pd.read_csv(
-        r"Q:\CMP\LOS Monitoring 2022\Network_Conflation\v2202\conflation_script_test\manual_remove.csv"
-    )
+    rem_df = pd.read_csv("manual_remove.csv")
     rem_df["del_flag"] = 1
     inrix_lines_matched_output = inrix_lines_matched_output.merge(
         rem_df, how="left"
@@ -1773,9 +1770,7 @@ if MANUAL_UPDATE:
         pd.isna(inrix_lines_matched_output["del_flag"]),
     ]
 
-    add_df = pd.read_csv(
-        r"Q:\CMP\LOS Monitoring 2022\Network_Conflation\v2202\conflation_script_test\manual_add.csv"
-    )
+    add_df = pd.read_csv("manual_add.csv")
     inrix_lines_matched_output = pd.concat(
         (inrix_lines_matched_output[cols], add_df)
     )
