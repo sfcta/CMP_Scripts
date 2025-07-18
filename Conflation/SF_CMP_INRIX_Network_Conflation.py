@@ -3,12 +3,12 @@ This script is developed to automatically establish the corresponding relationsh
 It finds INRIX links that are near each CMP segment and decides the matching links based on street name, angle and distance attributes.
 
 INPUTS:
-1. cmp_roadway_segments.shp, the CMP segment shapefile provided by SFCTA.
-2. inrix_xd_sf.shp, the INRIX XD network shapefile provided by INRIX. Because the originial shapefile provided is for the whole
-state of California, only roadways in San Francisco County are selected and exported as inrix_xd_sf.shp.
+1. cmp_roadway_segments.gpkg, the CMP segment GIS file provided by SFCTA.
+2. inrix_xd_sf.gpkg, the INRIX XD network shapefile provided by INRIX. Because the originial shapefile provided is for the whole
+state of California, only roadways in San Francisco County are selected and exported as inrix_xd_sf.gpkg.
 
 OUTPUTS:
-1. cmp_roadway_segments_matchedlength_check.shp, a shapefile generated for quality check purpose. The field "Len_Ratio" indicates the
+1. cmp_roadway_segments_matchedlength_check.gpkg, a shapefile generated for quality check purpose. The field "Len_Ratio" indicates the
 ratio of the total length of matched INRIX links over the length of the CMP segment. Special attention should should be given to
 segments whose Len_Ratio is below 95% or over 100%.
 2. CMP_Segment_INRIX_Links_Correspondence.csv, a csv file containing the correspondence between CMP segments and INRIX XD links. The
@@ -29,10 +29,10 @@ MAP_VER = 2301
 inrix_sf = f"INRIX_XD-SF-{MAP_VER}"  # .gpkg'
 segid_col = "XDSegID"
 # CMP network
-# CMP network (as in the reports)
-# cmp = "Q:\GIS\Transportation\Roads\CMP\cmp_roadway_segments"  # .shp"  # HOTFIX, leaving the extension hardcoded below
-# online COVID congestion tracker network:
-cmp = "Q:\CMP\LOS Monitoring 2022\CMP_exp_shp\cmp_segments_exp_v2201"  # .shp"  # HOTFIX, leaving the extension hardcoded below
+# CMP network (as in the biennial reports)
+# cmp_segments_gis_filepath = "Q:\GIS\Transportation\Roads\CMP\cmp_roadway_segments"  # .gpkg"  # HOTFIX, leaving the extension hardcoded below
+# online monthly congestion dashboard network:
+cmp_segments_gis_filepath = "Q:\GIS\Transportation\Roads\CMP\cmp_roadway_segments-expanded-v202204.gpkg"  # .gpkg"  # HOTFIX, leaving the extension hardcoded below
 
 
 import math
@@ -41,22 +41,14 @@ import warnings
 
 # Import needed python modules
 import fiona
-import fiona.crs
-import geopandas as gp
+import geopandas as gpd
 import numpy as np
 import pandas as pd
-from shapely.geometry import LineString, Point, mapping
+from shapely.geometry import Point, mapping
 
 warnings.filterwarnings("ignore")
 
-# Define WGS 1984 coordinate system
-wgs84 = {
-    "proj": "longlat",
-    "ellps": "WGS84",
-    "datum": "WGS84",
-    "no_defs": True,
-}
-# Define NAD 1983 StatePlane California III
+# NAD 1983 StatePlane California III
 cal3 = {
     "proj": "lcc +lat_1=37.06666666666667 +lat_2=38.43333333333333 +lat_0=36.5 +lon_0=-120.5 +x_0=2000000 +y_0=500000.0000000002",
     "ellps": "GRS80",
@@ -66,26 +58,23 @@ cal3 = {
 
 # Convert original coordinate system to California III state plane
 # CMP network
-cmp_segs_org = gp.read_file(cmp + ".shp")
-cmp_segs_prj = cmp_segs_org.to_crs(cal3)
-cmp_segs_prj["cmp_name"] = cmp_segs_prj["cmp_name"].str.replace("/ ", "/")
-cmp_segs_prj["Length"] = cmp_segs_prj.geometry.length
-cmp_segs_prj["Length"] = cmp_segs_prj["Length"] * 3.2808  # meters to feet
-cmp_segs_prj.to_file(os.path.splitext(cmp)[0] + "_prj.shp")
+cmp_segments = gpd.read_file(cmp_segments_gis_filepath + ".gpkg").to_crs(cal3)
+cmp_segments["cmp_name"] = cmp_segments["cmp_name"].str.replace("/ ", "/")
+cmp_segments["Length"] = cmp_segments.geometry.length
+cmp_segments["Length"] = cmp_segments["Length"] * 3.2808  # meters to feet
+cmp_segments.to_file(os.path.splitext(cmp_segments_gis_filepath)[0] + "_prj.gpkg")
 
 # INRIX XD network
-inrix_net_org = gp.read_file(
-    inrix_sf + ".gpkg"
-)  # HOTFIX, leaving this hardcoded for now, switched from .shp to .gpkg
-inrix_net_prj = inrix_net_org.to_crs(cal3)
-inrix_net_prj["Length"] = inrix_net_prj.geometry.length
-inrix_net_prj["Length"] = inrix_net_prj["Length"] * 3.2808  # meters to feet
-inrix_net_prj["SegID"] = inrix_net_prj[segid_col].astype(int)
-inrix_net_prj["Miles"] = inrix_net_prj["Miles"].astype(float)
-inrix_net_prj = inrix_net_prj.rename(
+# HOTFIX, leaving this hardcoded for now
+inrix_network = gpd.read_file(inrix_sf + ".gpkg").to_crs(cal3)
+inrix_network["Length"] = inrix_network.geometry.length
+inrix_network["Length"] = inrix_network["Length"] * 3.2808  # meters to feet
+inrix_network["SegID"] = inrix_network[segid_col].astype(int)
+inrix_network["Miles"] = inrix_network["Miles"].astype(float)
+inrix_network = inrix_network.rename(
     columns={"PreviousXD": "PreviousSe", "NextXDSegI": "NextSegID"}
 )
-inrix_net_prj.to_file(os.path.splitext(inrix_sf)[0] + "_prj.shp")
+inrix_network.to_file(os.path.splitext(inrix_sf)[0] + "_prj.gpkg")
 
 
 # # Get endpoints of INRIX links
@@ -101,12 +90,10 @@ vschema = {
     },
 }
 # Input file
-inrixin = inrix_sf + "_prj.shp"
+inrixin = inrix_sf + "_prj.gpkg"
 # Output file
-inrixout = inrix_sf + "_prj_endpoints.shp"
-with fiona.open(
-    inrixout, mode="w", crs=cal3, driver="ESRI Shapefile", schema=vschema
-) as output:
+inrixout = inrix_sf + "_prj_endpoints.gpkg"
+with fiona.open(inrixout, mode="w", crs=cal3, driver="GPKG", schema=vschema) as output:
     layer = fiona.open(inrixin)
     for line in layer:
         vertices = line["geometry"]["coordinates"]
@@ -159,7 +146,7 @@ with fiona.open(
 
 
 # Read in the created inrix endpoints file
-endpoints = gp.read_file(inrix_sf + "_prj_endpoints.shp")
+endpoints = gpd.read_file(inrix_sf + "_prj_endpoints.gpkg")
 
 # Assign unique node id
 endpoints_cnt = endpoints.groupby(["Latitude", "Longitude"]).SegID.count().reset_index()
@@ -171,8 +158,8 @@ endpoints_cnt["Coordinates"] = list(
     zip(endpoints_cnt.Longitude, endpoints_cnt.Latitude)
 )
 endpoints_cnt["Coordinates"] = endpoints_cnt["Coordinates"].apply(Point)
-endpoints_cnt_gpd = gp.GeoDataFrame(endpoints_cnt, geometry="Coordinates")
-endpoints_cnt_gpd.to_file(inrix_sf + "_prj_endpoints_unique.shp")
+endpoints_cnt_gpd = gpd.GeoDataFrame(endpoints_cnt, geometry="Coordinates")
+endpoints_cnt_gpd.to_file(inrix_sf + "_prj_endpoints_unique.gpkg")
 
 endpoints = endpoints.merge(endpoints_cnt, on=["Latitude", "Longitude"], how="left")
 
@@ -187,8 +174,8 @@ endpoints_end = endpoints[endpoints["type"] == "end"][
 ]
 endpoints_end.columns = ["SegID", "E_Lat", "E_Long", "E_NodeID"]
 
-inrix_net_prj = inrix_net_prj.merge(endpoints_begin, on="SegID")
-inrix_net_prj = inrix_net_prj.merge(endpoints_end, on="SegID")
+inrix_network = inrix_network.merge(endpoints_begin, on="SegID")
+inrix_network = inrix_network.merge(endpoints_end, on="SegID")
 
 
 # # Get endnodes of CMP segments
@@ -206,13 +193,11 @@ cmp_schema = {
 }
 node_cnt = 0
 # Input file
-cmpin = cmp + "_prj.shp"
+cmpin = cmp_segments_gis_filepath + "_prj.gpkg"
 
 # Output file
-cmpout = cmp + "_prj_endpoints.shp"
-with fiona.open(
-    cmpout, mode="w", crs=cal3, driver="ESRI Shapefile", schema=cmp_schema
-) as output:
+cmpout = cmp_segments_gis_filepath + "_prj_endpoints.gpkg"
+with fiona.open(cmpout, mode="w", crs=cal3, driver="GPKG", schema=cmp_schema) as output:
     layer = fiona.open(cmpin)
     for line in layer:
         vertices = line["geometry"]["coordinates"]
@@ -272,7 +257,7 @@ with fiona.open(
 
 
 # Read in the created cmp endpoints
-cmp_endpoints = gp.read_file(cmp + "_prj_endpoints.shp")
+cmp_endpoints = gpd.read_file(cmp_segments_gis_filepath + "_prj_endpoints.gpkg")
 
 cmp_endpoint_b = cmp_endpoints[cmp_endpoints["type"] == "begin"][
     ["cmp_segid", "Latitude", "Longitude", "NodeID"]
@@ -283,11 +268,11 @@ cmp_endpoint_e = cmp_endpoints[cmp_endpoints["type"] == "end"][
 ]
 cmp_endpoint_e.columns = ["cmp_segid", "E_Lat", "E_Long", "CMP_Node_E"]
 
-cmp_segs_prj = cmp_segs_prj.merge(cmp_endpoint_b, on="cmp_segid", how="left")
-cmp_segs_prj = cmp_segs_prj.merge(cmp_endpoint_e, on="cmp_segid", how="left")
+cmp_segments = cmp_segments.merge(cmp_endpoint_b, on="cmp_segid", how="left")
+cmp_segments = cmp_segments.merge(cmp_endpoint_e, on="cmp_segid", how="left")
 
 # Calculate the bearing of cmp segments
-cmp_segs_prj["Degree"] = cmp_segs_prj.apply(
+cmp_segments["Degree"] = cmp_segments.apply(
     lambda x: (180 / math.pi)
     * math.atan2(x["E_Long"] - x["B_Long"], x["E_Lat"] - x["B_Lat"]),
     axis=1,
@@ -299,40 +284,42 @@ cmp_segs_prj["Degree"] = cmp_segs_prj.apply(
 # Create a buffer zone for each cmp segment
 ft = 150  # 150 ft distance
 mt = round(ft / 3.2808, 4)
-cmp_segs_buffer = cmp_segs_prj.copy()
+cmp_segs_buffer = cmp_segments.copy()
 cmp_segs_buffer["geometry"] = np.where(
     cmp_segs_buffer["cmp_segid"] == 81,
     cmp_segs_buffer.geometry.buffer(mt * 2),
     cmp_segs_buffer.geometry.buffer(mt),
 )
-cmp_segs_buffer.to_file(cmp + "_prj_buffer.shp")
+cmp_segs_buffer.to_file(cmp_segments_gis_filepath + "_prj_buffer.gpkg")
 
 # INRIX lines intersecting cmp segment buffer zone
-inrix_lines_intersect = gp.sjoin(
-    inrix_net_prj, cmp_segs_buffer, op="intersects"
+inrix_lines_intersect = gpd.sjoin(
+    inrix_network, cmp_segs_buffer, op="intersects"
 ).reset_index()
 
 # INRIX lines within cmp segment buffer zone
-inrix_lines_within = gp.sjoin(inrix_net_prj, cmp_segs_buffer, op="within").reset_index()
+inrix_lines_within = gpd.sjoin(
+    inrix_network, cmp_segs_buffer, op="within"
+).reset_index()
 
 
 # ## Determine matching INRIX links within each CMP buffer
 len_ratio_thrhd = 0.8
 angle_thrhd = 15
-for cmp_seg_idx in range(len(cmp_segs_prj)):
-    cmp_seg_id = cmp_segs_prj.loc[cmp_seg_idx, "cmp_segid"]
-    cmp_seg_geo = cmp_segs_prj.loc[cmp_seg_idx]["geometry"]
-    cmp_seg_len = cmp_segs_prj.loc[cmp_seg_idx]["Length"]
-    cmp_b_lat = cmp_segs_prj.loc[cmp_seg_idx]["B_Lat"]
-    cmp_b_long = cmp_segs_prj.loc[cmp_seg_idx]["B_Long"]
-    cmp_e_lat = cmp_segs_prj.loc[cmp_seg_idx]["E_Lat"]
-    cmp_e_long = cmp_segs_prj.loc[cmp_seg_idx]["E_Long"]
+for cmp_seg_idx in range(len(cmp_segments)):
+    cmp_seg_id = cmp_segments.loc[cmp_seg_idx, "cmp_segid"]
+    cmp_seg_geo = cmp_segments.loc[cmp_seg_idx]["geometry"]
+    cmp_seg_len = cmp_segments.loc[cmp_seg_idx]["Length"]
+    cmp_b_lat = cmp_segments.loc[cmp_seg_idx]["B_Lat"]
+    cmp_b_long = cmp_segments.loc[cmp_seg_idx]["B_Long"]
+    cmp_e_lat = cmp_segments.loc[cmp_seg_idx]["E_Lat"]
+    cmp_e_long = cmp_segments.loc[cmp_seg_idx]["E_Long"]
     cmp_names = (
-        cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"].lower().split("/")
+        cmp_segments.loc[cmp_seg_idx]["cmp_name"].lower().split("/")
     )  # Street name
-    if cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"] == "Doyle/Lombard/Richardson":
+    if cmp_segments.loc[cmp_seg_idx]["cmp_name"] == "Doyle/Lombard/Richardson":
         cmp_names = cmp_names + ["us-101", "us 101"]
-    if cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"] == "Duboce/Division":
+    if cmp_segments.loc[cmp_seg_idx]["cmp_name"] == "Duboce/Division":
         cmp_names = cmp_names + ["13th st", "13th street", "central freeway"]
     if (cmp_seg_id == 147) or (cmp_seg_id == 148):
         cmp_names = cmp_names + ["kennedy"]
@@ -340,26 +327,26 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
         cmp_names = cmp_names + ["veterans"]
 
     # v2001 updates
-    if cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"] in [
+    if cmp_segments.loc[cmp_seg_idx]["cmp_name"] in [
         "19th Ave/Park Presidio",
         "Junipero Serra",
     ]:
         cmp_names = cmp_names + ["ca 1"]
-    if cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"] in ["Skyline", "Sloat"]:
+    if cmp_segments.loc[cmp_seg_idx]["cmp_name"] in ["Skyline", "Sloat"]:
         cmp_names = cmp_names + ["ca 35"]
-    if cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"] == "I-80":
+    if cmp_segments.loc[cmp_seg_idx]["cmp_name"] == "I-80":
         cmp_names = cmp_names + ["i 80", "james lick freeway"]
-    if cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"] == "I-280":
+    if cmp_segments.loc[cmp_seg_idx]["cmp_name"] == "I-280":
         cmp_names = cmp_names + ["i 280"]
-    if cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"] in ["US-101"]:
+    if cmp_segments.loc[cmp_seg_idx]["cmp_name"] in ["US-101"]:
         cmp_names = cmp_names + ["us 101", "central freeway"]
-    if cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"] in ["Van Ness/S VanNess"]:
+    if cmp_segments.loc[cmp_seg_idx]["cmp_name"] in ["Van Ness/S VanNess"]:
         cmp_names = cmp_names + ["us 101"]
-    if cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"] in ["Geary"]:
+    if cmp_segments.loc[cmp_seg_idx]["cmp_name"] in ["Geary"]:
         cmp_names = cmp_names + ["geary boulevard", "point lobos avenue"]
-    if cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"] in ["Guerrero/San Jose"]:
+    if cmp_segments.loc[cmp_seg_idx]["cmp_name"] in ["Guerrero/San Jose"]:
         cmp_names = cmp_names + ["san jose avenue"]
-    if cmp_segs_prj.loc[cmp_seg_idx]["cmp_name"] in ["Harrison"]:
+    if cmp_segments.loc[cmp_seg_idx]["cmp_name"] in ["Harrison"]:
         cmp_names = cmp_names + ["harrison street"]
     if (cmp_seg_id == 52) or (cmp_seg_id == 47):
         cmp_names = ["robert c levy tunnel"]
@@ -527,34 +514,34 @@ inrix_matched_length = (
 )
 inrix_matched_length.columns = ["cmp_segid", "Len_Matched"]
 inrix_matched_length["cmp_segid"] = inrix_matched_length["cmp_segid"].astype(int)
-cmp_segs_prj = cmp_segs_prj.merge(inrix_matched_length, on="cmp_segid", how="left")
+cmp_segments = cmp_segments.merge(inrix_matched_length, on="cmp_segid", how="left")
 
 # Calculate the ratio of the total length of matched INRIX links to the CMP segment length
-cmp_segs_prj["Len_Ratio"] = np.where(
-    pd.isnull(cmp_segs_prj["Len_Matched"]),
+cmp_segments["Len_Ratio"] = np.where(
+    pd.isnull(cmp_segments["Len_Matched"]),
     0.0,
-    cmp_segs_prj["Len_Matched"] / cmp_segs_prj["Length"],
+    cmp_segments["Len_Matched"] / cmp_segments["Length"],
 )
-cmp_segs_prj["Len_Ratio"] = cmp_segs_prj["Len_Ratio"].round(1)
+cmp_segments["Len_Ratio"] = cmp_segments["Len_Ratio"].round(1)
 
 
 # ## Search forward and backward based on already matched INRIX links
 # Establish sequence from matched links
 gap_thrhd = 0.01
-for cmp_seg_idx in range(len(cmp_segs_prj)):
-    if (cmp_segs_prj.loc[cmp_seg_idx, "Len_Ratio"] > 0) & (
-        cmp_segs_prj.loc[cmp_seg_idx, "Len_Ratio"] < 98
+for cmp_seg_idx in range(len(cmp_segments)):
+    if (cmp_segments.loc[cmp_seg_idx, "Len_Ratio"] > 0) & (
+        cmp_segments.loc[cmp_seg_idx, "Len_Ratio"] < 98
     ):
-        cmp_seg_id = cmp_segs_prj.loc[cmp_seg_idx, "cmp_segid"]
-        cmp_seg_geo = cmp_segs_prj.loc[cmp_seg_idx]["geometry"]
-        cmp_seg_buffer = cmp_segs_prj.loc[cmp_seg_idx]["geometry"].buffer(
+        cmp_seg_id = cmp_segments.loc[cmp_seg_idx, "cmp_segid"]
+        cmp_seg_geo = cmp_segments.loc[cmp_seg_idx]["geometry"]
+        cmp_seg_buffer = cmp_segments.loc[cmp_seg_idx]["geometry"].buffer(
             mt
         )  # Create 150ft buffer for the segment
-        cmp_b_lat = cmp_segs_prj.loc[cmp_seg_idx]["B_Lat"]
-        cmp_b_long = cmp_segs_prj.loc[cmp_seg_idx]["B_Long"]
-        cmp_e_lat = cmp_segs_prj.loc[cmp_seg_idx]["E_Lat"]
-        cmp_e_long = cmp_segs_prj.loc[cmp_seg_idx]["E_Long"]
-        cmp_seg_len = cmp_segs_prj.loc[cmp_seg_idx]["Length"]
+        cmp_b_lat = cmp_segments.loc[cmp_seg_idx]["B_Lat"]
+        cmp_b_long = cmp_segments.loc[cmp_seg_idx]["B_Long"]
+        cmp_e_lat = cmp_segments.loc[cmp_seg_idx]["E_Lat"]
+        cmp_e_long = cmp_segments.loc[cmp_seg_idx]["E_Long"]
+        cmp_seg_len = cmp_segments.loc[cmp_seg_idx]["Length"]
 
         inrix_lns_matched = inrix_lines_matched_final[
             inrix_lines_matched_final["cmp_segid"] == cmp_seg_id
@@ -567,7 +554,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
             inrix_matched_first_idx
         ]["INX_B_CMP_B"]
         if inrix_matched_first_b_dis / cmp_seg_len < gap_thrhd:
-            cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = "Yes"
+            cmp_segments.loc[cmp_seg_idx, "CMP_B_Indt"] = "Yes"
         else:
             # Need find previous links
             preNode = inrix_lines_matched_final.loc[inrix_matched_first_idx]["B_NodeID"]
@@ -591,7 +578,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                     & (inrix_lines_intersect["E_NodeID"] == preNode)
                 ]
                 if len(preLinks) == 0:
-                    cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = (
+                    cmp_segments.loc[cmp_seg_idx, "CMP_B_Indt"] = (
                         "Previous links not found"
                     )
                     break
@@ -793,11 +780,11 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             else:
                                 preLinks.loc[prelink_idx, "Matching"] = "No"
                     if matched == 1:
-                        cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = "Yes-LinkAdded"
+                        cmp_segments.loc[cmp_seg_idx, "CMP_B_Indt"] = "Yes-LinkAdded"
                     if (
                         found == 0
                     ):  # break while loop if no mathcing link found in prelinks
-                        cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = (
+                        cmp_segments.loc[cmp_seg_idx, "CMP_B_Indt"] = (
                             "No Matching Previous Link"
                         )
                         break
@@ -807,7 +794,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
             "INX_E_CMP_E"
         ]
         if inrix_matched_e_dis / cmp_seg_len < gap_thrhd:
-            cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = "Yes"
+            cmp_segments.loc[cmp_seg_idx, "CMP_E_Indt"] = "Yes"
         else:
             nextNode = inrix_lines_matched_final.loc[inrix_matched_first_idx][
                 "E_NodeID"
@@ -847,7 +834,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                         & (inrix_lines_intersect["B_NodeID"] == nextNode)
                     ]
                     if len(nextLinks) == 0:
-                        cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = (
+                        cmp_segments.loc[cmp_seg_idx, "CMP_E_Indt"] = (
                             "Next links not found"
                         )
                         break
@@ -1065,13 +1052,13 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                                 else:
                                     nextLinks.loc[nextlink_idx, "Matching"] = "No"
                         if matched == 1:
-                            cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = (
+                            cmp_segments.loc[cmp_seg_idx, "CMP_E_Indt"] = (
                                 "Yes-LinkAdded"
                             )
                         if (
                             found == 0
                         ):  # break while loop if no mathcing link found in nextlinks
-                            cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = (
+                            cmp_segments.loc[cmp_seg_idx, "CMP_E_Indt"] = (
                                 "No Matching Next Link"
                             )
                             break
@@ -1083,36 +1070,36 @@ ft = 150
 mt = round(ft / 3.2808, 4)
 cmp_endpoints_buffer = cmp_endpoints.copy()
 cmp_endpoints_buffer["geometry"] = cmp_endpoints_buffer.geometry.buffer(mt)
-cmp_endpoints_buffer.to_file(cmp + "_prj_endpoints_buffer.shp")
+cmp_endpoints_buffer.to_file(cmp_segments_gis_filepath + "_prj_endpoints_buffer.gpkg")
 
 # INRIX lines intersecting with cmp endpoint buffer zone
-inrix_lines_intersect_ep = gp.sjoin(
-    inrix_net_prj, cmp_endpoints_buffer, op="intersects"
+inrix_lines_intersect_ep = gpd.sjoin(
+    inrix_network, cmp_endpoints_buffer, op="intersects"
 ).reset_index()
 
 
 # Find matching lines for zero Len_Ratio
-for cmp_seg_idx in range(len(cmp_segs_prj)):
-    if cmp_segs_prj.loc[cmp_seg_idx, "Len_Ratio"] == 0:
-        cmp_seg_id = cmp_segs_prj.loc[cmp_seg_idx, "cmp_segid"]
-        cmp_seg_geo = cmp_segs_prj.loc[cmp_seg_idx]["geometry"]
-        cmp_seg_buffer = cmp_segs_prj.loc[cmp_seg_idx]["geometry"].buffer(
+for cmp_seg_idx in range(len(cmp_segments)):
+    if cmp_segments.loc[cmp_seg_idx, "Len_Ratio"] == 0:
+        cmp_seg_id = cmp_segments.loc[cmp_seg_idx, "cmp_segid"]
+        cmp_seg_geo = cmp_segments.loc[cmp_seg_idx]["geometry"]
+        cmp_seg_buffer = cmp_segments.loc[cmp_seg_idx]["geometry"].buffer(
             mt
         )  # Create 150ft buffer for the segment
-        cmp_seg_len = cmp_segs_prj.loc[cmp_seg_idx]["Length"]
-        cmp_b_id = cmp_segs_prj.loc[cmp_seg_idx]["CMP_Node_B"]
-        cmp_b_lat = cmp_segs_prj.loc[cmp_seg_idx]["B_Lat"]
-        cmp_b_long = cmp_segs_prj.loc[cmp_seg_idx]["B_Long"]
-        cmp_e_id = cmp_segs_prj.loc[cmp_seg_idx]["CMP_Node_E"]
-        cmp_e_lat = cmp_segs_prj.loc[cmp_seg_idx]["E_Lat"]
-        cmp_e_long = cmp_segs_prj.loc[cmp_seg_idx]["E_Long"]
+        cmp_seg_len = cmp_segments.loc[cmp_seg_idx]["Length"]
+        cmp_b_id = cmp_segments.loc[cmp_seg_idx]["CMP_Node_B"]
+        cmp_b_lat = cmp_segments.loc[cmp_seg_idx]["B_Lat"]
+        cmp_b_long = cmp_segments.loc[cmp_seg_idx]["B_Long"]
+        cmp_e_id = cmp_segments.loc[cmp_seg_idx]["CMP_Node_E"]
+        cmp_e_lat = cmp_segments.loc[cmp_seg_idx]["E_Lat"]
+        cmp_e_long = cmp_segments.loc[cmp_seg_idx]["E_Long"]
 
         intersect_b = inrix_lines_intersect_ep[
             inrix_lines_intersect_ep["NodeID"] == cmp_b_id
         ]
 
         if intersect_b.empty:
-            cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = "No Intersecting Lines Found"
+            cmp_segments.loc[cmp_seg_idx, "CMP_B_Indt"] = "No Intersecting Lines Found"
         else:
             found_b = 0
             found_match = 0
@@ -1246,13 +1233,13 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                         break  # link_idx for loop
 
             if found_match == 1:
-                cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = (
+                cmp_segments.loc[cmp_seg_idx, "CMP_B_Indt"] = (
                     "Found Matching Link for Whole CMP Segment"
                 )
                 continue
 
             if found_b == 0:
-                cmp_segs_prj.loc[cmp_seg_idx, "CMP_B_Indt"] = (
+                cmp_segments.loc[cmp_seg_idx, "CMP_B_Indt"] = (
                     "No Matching Intersecting Link"
                 )
                 continue
@@ -1277,7 +1264,7 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                     & (inrix_lines_intersect["B_NodeID"] == nextNode)
                 ]
                 if len(nextLinks) == 0:
-                    cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = "Next links not found"
+                    cmp_segments.loc[cmp_seg_idx, "CMP_E_Indt"] = "Next links not found"
                     break
                 else:
                     nextLinks_idx = nextLinks.index.tolist()
@@ -1500,18 +1487,18 @@ for cmp_seg_idx in range(len(cmp_segs_prj)):
                             else:
                                 nextLinks.loc[nextlink_idx, "Matching"] = "No"
                     if found_next_match == 1:
-                        cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = "Yes-LinkAdded"
+                        cmp_segments.loc[cmp_seg_idx, "CMP_E_Indt"] = "Yes-LinkAdded"
                     if (
                         found_next == 0
                     ):  # break while loop if no mathcing link found in nextlinks
-                        cmp_segs_prj.loc[cmp_seg_idx, "CMP_E_Indt"] = (
+                        cmp_segments.loc[cmp_seg_idx, "CMP_E_Indt"] = (
                             "No Matching Next Link"
                         )
                         break
 
 
-del cmp_segs_prj["Len_Matched"]
-del cmp_segs_prj["Len_Ratio"]
+del cmp_segments["Len_Matched"]
+del cmp_segments["Len_Ratio"]
 
 # Calculate the total length of matched INRIX links
 inrix_matched_length = (
@@ -1520,13 +1507,13 @@ inrix_matched_length = (
 inrix_matched_length.columns = ["cmp_segid", "Len_Matched"]
 inrix_matched_length["cmp_segid"] = inrix_matched_length["cmp_segid"].astype(int)
 
-cmp_segs_prj = cmp_segs_prj.merge(inrix_matched_length, on="cmp_segid", how="left")
-cmp_segs_prj["Len_Ratio"] = np.where(
-    pd.isnull(cmp_segs_prj["Len_Matched"]),
+cmp_segments = cmp_segments.merge(inrix_matched_length, on="cmp_segid", how="left")
+cmp_segments["Len_Ratio"] = np.where(
+    pd.isnull(cmp_segments["Len_Matched"]),
     0,
-    cmp_segs_prj["Len_Matched"] / cmp_segs_prj["Length"],
+    cmp_segments["Len_Matched"] / cmp_segments["Length"],
 )
-cmp_segs_prj["Len_Ratio"] = cmp_segs_prj["Len_Ratio"].round(1)
+cmp_segments["Len_Ratio"] = cmp_segments["Len_Ratio"].round(1)
 
 inrix_lines_matched_output = inrix_lines_matched_final[
     ["cmp_segid", "SegID", "Length_Matched"]
@@ -1534,7 +1521,7 @@ inrix_lines_matched_output = inrix_lines_matched_final[
 inrix_lines_matched_output.columns = ["CMP_SegID", "INRIX_SegID", "Length_Matched"]
 
 # Output files
-cmp_segs_prj.to_file(cmp + "_matchedlength_check.shp")
+cmp_segments.to_file(cmp_segments_gis_filepath + "_matchedlength_check.gpkg")
 
 inrix_lines_matched_output[["CMP_SegID", "INRIX_SegID"]] = inrix_lines_matched_output[
     ["CMP_SegID", "INRIX_SegID"]
