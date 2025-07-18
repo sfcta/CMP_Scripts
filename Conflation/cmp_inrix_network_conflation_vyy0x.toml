@@ -1,0 +1,22 @@
+# mode: pick either biennial (CMP reports) or monthly (congestion dashboard)
+# mode = "biennial"
+mode = "monthly"
+inrix_map_version = "yy0x"
+
+[input_gis_filepath]  # HOTFIX leaving out .gpkg for legacy code compatibility
+inrix_sf_network = "INRIX_XD-SF-{inrix_map_version}"
+
+[input_gis_filepath.cmp_segments]
+biennial = "Q:/GIS/Transportation/Roads/CMP/cmp_roadway_segments"
+monthly = "Q:/GIS/Transportation/Roads/CMP/cmp_roadway_segments-expanded-v202204"
+
+[manual_update]
+manual_update = true
+
+[manual_update.csv]
+remove = "Q:/CMP/LOS Monitoring 2022/Network_Conflation/v2202/conflation_script_test/manual_remove.csv"
+add = "Q:/CMP/LOS Monitoring 2022/Network_Conflation/v2202/conflation_script_test/manual_add.csv"
+
+[output]
+dir = "Q:/CMP/LOS Monitoring YYYY/Network_Conflation/vyy0x/"
+filename_base = "CMP_Segment_INRIX_Links_Correspondence_{inrix_map_version}"  # no ext
